@@ -48,7 +48,7 @@ def get_knowledge(kb_type: str, kb_config: dict) -> Knowledge:
         return Knowledge(contents_db=contents_db, vector_db=vector_db, name=kb_config['knowledge_name'])
     return None
 
-def get_agent(model, instructions, kb_type, kb_config, history_db, session_id) -> Agent:
+def get_agent(model, instructions, kb_type, kb_config, session_id) -> Agent:
     """Creates the Agent instance."""
     
     knowledge = get_knowledge(kb_type, kb_config)
@@ -73,7 +73,6 @@ def get_agent(model, instructions, kb_type, kb_config, history_db, session_id) -
         model=model,
         tools=[knowledge_tools] if knowledge_tools else [],
         instructions=instructions.splitlines(),
-        db=history_db,
         session_id=session_id,
         markdown=True,
     )

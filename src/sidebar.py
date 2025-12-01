@@ -7,14 +7,17 @@ import entities
 
 def load_session_list(db: SqliteDb):
     sess_list = []
-    stmt = text("SELECT session_id FROM agno_sessions")
+    # Create the table if it doesn't exist yet to avoid errors
     try:
         with db.Session() as sess:
+            # Check if table exists first (optional safety)
+            stmt = text("SELECT DISTINCT session_id FROM custom_chat_history")
             rows = sess.execute(stmt).fetchall()
             for r in rows:
-                sess_list.append(r._mapping["session_id"])
-    except Exception as e:
-        print(f"DB Read Error (likely empty DB): {e}")
+                if r[0]: sess_list.append(r[0])
+    except Exception:
+        # Table might not exist on first run
+        pass
     return sess_list
 
 def render_sidebar(history_db: SqliteDb):
@@ -35,7 +38,6 @@ def render_sidebar(history_db: SqliteDb):
         with st.expander("Model Configuration", expanded=False):
             model_provider = st.selectbox("Choose your model provider", ("DeepSeek", "OpenAI", "Ollama"))
             
-            # Helper to manage initial load
             if 'initial' not in st.session_state:
                 st.session_state['initial'] = True
 
@@ -54,7 +56,7 @@ def render_sidebar(history_db: SqliteDb):
                 model_params["id"] = st.text_input("Model ID", value="deepseek-chat")
                 model_params["name"] = st.text_input("Model name", value="Deepseek Agent")
 
-            # Initialize Model logic
+            # Initialize Model logic (Run once or on button click)
             if st.session_state['initial'] and model_params.get("id"):
                  st.session_state['model'] = entities.create_model(model_provider, **model_params)
                  st.session_state['initial'] = False
@@ -75,9 +77,9 @@ def render_sidebar(history_db: SqliteDb):
                 config["kb_config"] = {
                     "host": st.text_input("PostgreSQL Host", value="localhost"),
                     "port": st.text_input("PostgreSQL Port", value="5432"),
-                    "db": st.text_input("PostgreSQL Database", value="db"),
+                    "db": st.text_input("PostgreSQL Database", value="ai"),
                     "user": st.text_input("PostgreSQL User", value="postgres"),
-                    "password": st.text_input("PostgreSQL Password", type="password", value="123456"),
+                    "password": st.text_input("PostgreSQL Password", type="password", value="postgres"),
                     "table_name": st.text_input("Table Name", value="vectors"),
                     "knowledge_name": st.text_input("Knowledge name", value="PostgreSQL vector knowledge")
                 }
@@ -120,7 +122,7 @@ def render_sidebar(history_db: SqliteDb):
                 if c3.button("❌", key=f"del_{sid}"):
                     try:
                         with history_db.Session() as sess:
-                            sess.execute(text("DELETE FROM agno_sessions WHERE session_id = :sid"), {"sid": sid})
+                            sess.execute(text("DELETE FROM custom_chat_history WHERE session_id = :sid"), {"sid": sid})
                             sess.commit()
                         if st.session_state.get('session_id') == sid:
                             st.session_state['session_id'] = str(uuid4())
@@ -135,11 +137,6 @@ def render_sidebar(history_db: SqliteDb):
             if config["use_history"]:
                 config["use_full_history"] = st.checkbox("Using full history", value=True)
                 if not config["use_full_history"]:
-                    config["history_length"] = st.number_input("Max history messages", min_value=0, max_value=20, value=5)
-        
-        show_state = st.button("Show State", type="primary")
-        if show_state:
-            print("=== Current State ===")
-            for state in st.session_state:
-                print(f"{state}: {st.session_state[state]}")
+                    config["history_length"] = st.number_input("Max history messages", min_value=1, max_value=20, value=5)
+
     return config
