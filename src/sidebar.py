@@ -9,7 +9,6 @@ def load_session_list(db: SqliteDb):
     sess_list = []
     try:
         with db.Session() as sess:
-            # Query the new table 'chat_exchanges'
             stmt = text("SELECT DISTINCT session_id FROM chat_exchanges")
             rows = sess.execute(stmt).fetchall()
             for r in rows:
@@ -26,7 +25,8 @@ def render_sidebar(history_db: SqliteDb):
         "instructions": "You are a helpful assistant.",
         "use_history": False,
         "history_length": 5,
-        "use_full_history": True
+        "use_full_history": True,
+        "use_marked_context": False  # Default value
     }
 
     with st.sidebar:
@@ -39,7 +39,6 @@ def render_sidebar(history_db: SqliteDb):
             if 'initial' not in st.session_state:
                 st.session_state['initial'] = True
 
-            # Model Param Inputs
             model_params = {}
             if model_provider == "OpenAI":
                 model_params["api_key"] = st.text_input("OpenAI API Key", type="password", value=os.getenv("OPENAI_API_KEY"))
@@ -119,7 +118,6 @@ def render_sidebar(history_db: SqliteDb):
                 if c3.button("❌", key=f"del_{sid}"):
                     try:
                         with history_db.Session() as sess:
-                            # Delete from the new table
                             sess.execute(text("DELETE FROM chat_exchanges WHERE session_id = :sid"), {"sid": sid})
                             sess.commit()
                         if st.session_state.get('session_id') == sid:
@@ -136,5 +134,8 @@ def render_sidebar(history_db: SqliteDb):
                 config["use_full_history"] = st.checkbox("Using full history", value=True)
                 if not config["use_full_history"]:
                     config["history_length"] = st.number_input("Max history messages", min_value=1, max_value=20, value=5)
+            
+            st.divider()
+            config["use_marked_context"] = st.checkbox("Include MARKED messages as important context", value=False)
 
     return config
