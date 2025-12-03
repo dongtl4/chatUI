@@ -4,6 +4,7 @@ from uuid import uuid4
 from sqlalchemy import text
 from agno.db.sqlite import SqliteDb
 import entities
+import history
 
 def load_session_list(db: SqliteDb):
     sess_list = []
@@ -136,6 +137,43 @@ def render_sidebar(history_db: SqliteDb):
                     config["history_length"] = st.number_input("Max history messages", min_value=1, max_value=20, value=5)
             
             st.divider()
-            config["use_marked_context"] = st.checkbox("Include MARKED messages as important context", value=False)
+            config["use_marked_context"] = st.checkbox("Include MARKED messages as important context", value=True)
+
+        # --- Current Chat Navigation (Moved from main.py) ---
+        with st.expander("Current Chat", expanded=True):
+            if st.session_state.get("history"):
+                st.caption("Jump / Mark Important:")
+                
+                # Iterate through history to display navigation and markers
+                # We slice to exclude the very last active message if it's currently streaming/thinking
+                display_history = st.session_state.history
+                
+                for idx, item in enumerate(display_history):
+                    # We use cols to put checkbox and link side-by-side
+                    c_mark, c_link = st.columns([0.2, 0.8])
+                    
+                    with c_mark:
+                        msg_id = item.get("id")
+                        if msg_id:
+                            is_marked = st.checkbox(
+                                "Mark", 
+                                value=item.get("marked", False), 
+                                key=f"mark_chk_{msg_id}",
+                                label_visibility="collapsed"
+                            )
+                            
+                            # Update state and DB if changed
+                            if is_marked != item.get("marked", False):
+                                history.toggle_exchange_marker(history_db, msg_id, is_marked)
+                                item["marked"] = is_marked
+                                st.rerun()
+
+                    with c_link:
+                        user_text = item.get("user", "")
+                        label = (user_text[:20] + '...') if len(user_text) > 20 else user_text
+                        if not label: label = f"Msg {idx + 1}"
+                        st.markdown(f"[{idx + 1}. {label}](#msg-{idx})")
+            else:
+                st.caption("Start a conversation to see navigation.")
 
     return config
