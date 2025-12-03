@@ -8,8 +8,16 @@ def render_current_chat_container(placeholder):
     if not st.session_state.get("current_chat"):
         return
 
+    # Calculate index for the current running message
+    # Since st.session_state.history includes the current one being built, 
+    # the index is len(history) - 1
+    current_idx = len(st.session_state.get("history", [])) - 1
+    if current_idx < 0: current_idx = 0
+
     with placeholder.container():
-        # Display the last item in the list which is the current exchange
+        # Inject Anchor for the current streaming message
+        st.markdown(f"<div id='msg-{current_idx}'></div>", unsafe_allow_html=True)
+        
         if st.session_state["current_chat"]:
             msg_pair = st.session_state["current_chat"][-1]
             with st.chat_message("user"):
@@ -29,7 +37,6 @@ def handle_chat_run(agent, config, history_db):
 
     if submitted and query:
         # Update UI with the new pair structure
-        # current_chat is now a list of pairs, though we only really need the active one
         st.session_state["current_chat"] = [
             {"user": query, "assistant": ""} 
         ]
@@ -51,7 +58,6 @@ def handle_chat_run(agent, config, history_db):
             # --- CONTEXT CONSTRUCTION ---
             original_query = query if 'query' in locals() else st.session_state["current_chat"][-1]["user"]
             
-            # Create prompt for Agent
             final_prompt = original_query
             
             if config["use_history"]:
@@ -75,14 +81,12 @@ def handle_chat_run(agent, config, history_db):
                     if hasattr(chunk, 'event') and chunk.event == "RunContent":
                         if hasattr(chunk, 'content') and chunk.content:
                             full_response += chunk.content
-                            # Update the assistant part of the pair
                             st.session_state["current_chat"][-1]["assistant"] = full_response
                             render_current_chat_container(current_chat_placeholder)
             finally:
                 st.session_state.running = None
                 
-                # --- ATOMIC SAVE ---
-                # We now save the pair (User Input + Assistant Output) in one transaction
+                # saving current chat exchange
                 history.save_exchange_to_db(
                     history_db, 
                     st.session_state["session_id"], 

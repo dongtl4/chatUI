@@ -10,7 +10,6 @@ def save_exchange_to_db(db, session_id: str, user_content: str, assistant_conten
     if not db or not session_id:
         return
 
-    # New table schema: stores both parts of the conversation in one row
     create_table_sql = """
     CREATE TABLE IF NOT EXISTS chat_exchanges (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,7 +40,7 @@ def save_exchange_to_db(db, session_id: str, user_content: str, assistant_conten
 
 def load_history_from_custom_db(db, session_id: str) -> List[Dict[str, Any]]:
     """
-    Loads conversation pairs directly. No merging logic required.
+    Loads conversation pairs directly.
     """
     history = []
     if not session_id:
@@ -56,7 +55,6 @@ def load_history_from_custom_db(db, session_id: str) -> List[Dict[str, Any]]:
     
     try:
         with db.Session() as sess:
-            # Check if table exists first
             check_table = text("SELECT name FROM sqlite_master WHERE type='table' AND name='chat_exchanges'")
             if not sess.execute(check_table).fetchone():
                 return []
@@ -75,11 +73,14 @@ def load_history_from_custom_db(db, session_id: str) -> List[Dict[str, Any]]:
     return history
 
 def render_history_ui():
-    """Renders the chat history from session state."""
-    # If running, ignore the last entry (it's being built)
+    """Renders the chat history from session state with Anchor Tags."""
+    # If running, ignore the last entry (it's being built in chat.py)
     history_to_show = st.session_state.history[:-1] if st.session_state.get('running', None) is not None else st.session_state.history
 
-    for entry in history_to_show:
+    for idx, entry in enumerate(history_to_show):
+        # Inject the Anchor ID here
+        st.markdown(f"<div id='msg-{idx}'></div>", unsafe_allow_html=True)
+        
         with st.chat_message("user"):
             st.markdown(entry.get("user", "") or "_(no user message)_")
         with st.chat_message("assistant"):
