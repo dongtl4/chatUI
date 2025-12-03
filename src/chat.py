@@ -9,10 +9,13 @@ def render_current_chat_container(placeholder):
         return
 
     with placeholder.container():
-        for msg in st.session_state["current_chat"][-2:]:
-            role = "user" if msg["role"] == "user" else "assistant"
-            with st.chat_message(role):
-                st.markdown(msg.get("text", "") or f"_(no {role} message)_")
+        # Display the last item in the list which is the current exchange
+        if st.session_state["current_chat"]:
+            msg_pair = st.session_state["current_chat"][-1]
+            with st.chat_message("user"):
+                st.markdown(msg_pair.get("user", ""))
+            with st.chat_message("assistant"):
+                st.markdown(msg_pair.get("assistant", "") or "_(thinking...)_")
 
 def handle_chat_run(agent, config, history_db):
     """Main execution logic."""
@@ -25,16 +28,16 @@ def handle_chat_run(agent, config, history_db):
         submitted = st.form_submit_button("🚀 Get Answer", type="primary")
 
     if submitted and query:
-        # Update UI immediately with CLEAN query
+        # Update UI with the new pair structure
+        # current_chat is now a list of pairs, though we only really need the active one
         st.session_state["current_chat"] = [
-            {"role": "user", "text": query},
-            {"role": "assistant", "text": ""} 
+            {"user": query, "assistant": ""} 
         ]
+        
         # Optimistic update of history
         st.session_state["history"].append({
             "user": query,
             "assistant": "",
-            "marked": False
         })
         st.session_state.running = str(uuid4())
         st.rerun()
@@ -46,17 +49,16 @@ def handle_chat_run(agent, config, history_db):
             render_current_chat_container(current_chat_placeholder)
 
             # --- CONTEXT CONSTRUCTION ---
-            # Retrieve the original clean query
-            original_query = query if 'query' in locals() else st.session_state["current_chat"][-2]["text"]
+            original_query = query if 'query' in locals() else st.session_state["current_chat"][-1]["user"]
             
-            # Create the "polluted" prompt for the Agent only
+            # Create prompt for Agent
             final_prompt = original_query
             
             if config["use_history"]:
                 final_prompt = f"User's current question: {original_query}\n\n"
                 history_context_str = ""
                 
-                # Get history from state
+                # Get history from state (excluding current running item)
                 hist_source = st.session_state["history"][:-1]
                 if not config["use_full_history"]:
                      hist_source = hist_source[-config["history_length"]:]
@@ -69,30 +71,22 @@ def handle_chat_run(agent, config, history_db):
             # --- STREAMING ---
             full_response = ""
             try:
-                # Agent runs with the full context prompt
                 for chunk in agent.run(final_prompt, stream=True):
                     if hasattr(chunk, 'event') and chunk.event == "RunContent":
                         if hasattr(chunk, 'content') and chunk.content:
                             full_response += chunk.content
-                            st.session_state["current_chat"][-1]["text"] = full_response
+                            # Update the assistant part of the pair
+                            st.session_state["current_chat"][-1]["assistant"] = full_response
                             render_current_chat_container(current_chat_placeholder)
             finally:
                 st.session_state.running = None
                 
-                # --- MANUAL SAVE (CLEAN DATA) ---
-                # Save the original user query, not the history-padded prompt
-                history.save_message_to_db(
+                # --- ATOMIC SAVE ---
+                # We now save the pair (User Input + Assistant Output) in one transaction
+                history.save_exchange_to_db(
                     history_db, 
                     st.session_state["session_id"], 
-                    "user", 
-                    original_query
-                )
-                
-                # Save the assistant response
-                history.save_message_to_db(
-                    history_db, 
-                    st.session_state["session_id"], 
-                    "assistant", 
+                    original_query, 
                     full_response
                 )
                 

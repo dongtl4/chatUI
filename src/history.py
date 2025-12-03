@@ -1,26 +1,29 @@
 import streamlit as st
 from sqlalchemy import text
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 import time
 
-def save_message_to_db(db, session_id: str, role: str, content: str):
-    """Manually saves a message to a custom table."""
+def save_exchange_to_db(db, session_id: str, user_content: str, assistant_content: str):
+    """
+    Saves a complete conversation turn (User Input + Assistant Response) as a single atomic unit.
+    """
     if not db or not session_id:
         return
 
-    # Create table if not exists
+    # New table schema: stores both parts of the conversation in one row
     create_table_sql = """
-    CREATE TABLE IF NOT EXISTS custom_chat_history (
+    CREATE TABLE IF NOT EXISTS chat_exchanges (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         session_id TEXT,
-        role TEXT,
-        content TEXT,
+        user_content TEXT,
+        assistant_content TEXT,
         timestamp INTEGER
     );
     """
+    
     insert_sql = """
-    INSERT INTO custom_chat_history (session_id, role, content, timestamp)
-    VALUES (:session_id, :role, :content, :timestamp);
+    INSERT INTO chat_exchanges (session_id, user_content, assistant_content, timestamp)
+    VALUES (:session_id, :user_content, :assistant_content, :timestamp);
     """
     
     try:
@@ -28,23 +31,25 @@ def save_message_to_db(db, session_id: str, role: str, content: str):
             sess.execute(text(create_table_sql))
             sess.execute(text(insert_sql), {
                 "session_id": session_id,
-                "role": role,
-                "content": content,
+                "user_content": user_content,
+                "assistant_content": assistant_content,
                 "timestamp": int(time.time())
             })
             sess.commit()
     except Exception as e:
-        print(f"Error saving to DB: {e}")
+        print(f"Error saving exchange to DB: {e}")
 
 def load_history_from_custom_db(db, session_id: str) -> List[Dict[str, Any]]:
-    """Loads history from the custom table and merges it."""
-    merged = []
+    """
+    Loads conversation pairs directly. No merging logic required.
+    """
+    history = []
     if not session_id:
-        return merged
+        return history
 
     sql = """
-    SELECT role, content 
-    FROM custom_chat_history 
+    SELECT user_content, assistant_content
+    FROM chat_exchanges 
     WHERE session_id = :session_id 
     ORDER BY timestamp ASC
     """
@@ -52,40 +57,22 @@ def load_history_from_custom_db(db, session_id: str) -> List[Dict[str, Any]]:
     try:
         with db.Session() as sess:
             # Check if table exists first
-            check_table = text("SELECT name FROM sqlite_master WHERE type='table' AND name='custom_chat_history'")
+            check_table = text("SELECT name FROM sqlite_master WHERE type='table' AND name='chat_exchanges'")
             if not sess.execute(check_table).fetchone():
                 return []
 
             rows = sess.execute(text(sql), {"session_id": session_id}).fetchall()
             
-            pending_user = None
-            
             for row in rows:
-                role = row.role
-                content = row.content
-                
-                if role == "user":
-                    if pending_user is not None:
-                        merged.append({"user": pending_user, "assistant": ""})
-                    pending_user = content
-                elif role == "assistant":
-                    if pending_user is None:
-                        # Orphan assistant msg
-                        if merged:
-                            merged[-1]["assistant"] += content
-                        else:
-                            merged.append({"user": "", "assistant": content})
-                    else:
-                        merged.append({"user": pending_user, "assistant": content})
-                        pending_user = None
-            
-            if pending_user:
-                merged.append({"user": pending_user, "assistant": ""})
+                history.append({
+                    "user": row.user_content,
+                    "assistant": row.assistant_content
+                })
                 
     except Exception as e:
         print(f"DB Load Error: {e}")
         
-    return merged
+    return history
 
 def render_history_ui():
     """Renders the chat history from session state."""

@@ -7,16 +7,14 @@ import entities
 
 def load_session_list(db: SqliteDb):
     sess_list = []
-    # Create the table if it doesn't exist yet to avoid errors
     try:
         with db.Session() as sess:
-            # Check if table exists first (optional safety)
-            stmt = text("SELECT DISTINCT session_id FROM custom_chat_history")
+            # Query the new table 'chat_exchanges'
+            stmt = text("SELECT DISTINCT session_id FROM chat_exchanges")
             rows = sess.execute(stmt).fetchall()
             for r in rows:
                 if r[0]: sess_list.append(r[0])
     except Exception:
-        # Table might not exist on first run
         pass
     return sess_list
 
@@ -56,7 +54,6 @@ def render_sidebar(history_db: SqliteDb):
                 model_params["id"] = st.text_input("Model ID", value="deepseek-chat")
                 model_params["name"] = st.text_input("Model name", value="Deepseek Agent")
 
-            # Initialize Model logic (Run once or on button click)
             if st.session_state['initial'] and model_params.get("id"):
                  st.session_state['model'] = entities.create_model(model_provider, **model_params)
                  st.session_state['initial'] = False
@@ -66,7 +63,7 @@ def render_sidebar(history_db: SqliteDb):
 
             if st.button("Confirm Model", type="primary", disabled=bool(st.session_state.get('running', False))):
                 st.session_state['model'] = entities.create_model(model_provider, **model_params)
-                st.session_state.history = [] # Clear UI history on model switch
+                st.session_state.history = [] 
                 st.success(f"{model_provider} model configured!")
 
         # --- Knowledge Base Configuration ---
@@ -122,7 +119,8 @@ def render_sidebar(history_db: SqliteDb):
                 if c3.button("❌", key=f"del_{sid}"):
                     try:
                         with history_db.Session() as sess:
-                            sess.execute(text("DELETE FROM custom_chat_history WHERE session_id = :sid"), {"sid": sid})
+                            # Delete from the new table
+                            sess.execute(text("DELETE FROM chat_exchanges WHERE session_id = :sid"), {"sid": sid})
                             sess.commit()
                         if st.session_state.get('session_id') == sid:
                             st.session_state['session_id'] = str(uuid4())
