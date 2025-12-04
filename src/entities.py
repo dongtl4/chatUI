@@ -32,7 +32,7 @@ def get_knowledge(kb_type: str, kb_config: dict) -> Knowledge:
     """Creates and caches the knowledge base connection."""
     if kb_type == "PostgreSQL + PGVector":
         print(f"Creating new knowledge base: {kb_type}")
-        embedder = OllamaEmbedder(id="nomic-embed-text", dimensions=768)
+        embedder = OllamaEmbedder(id="nomic-embed-text", dimensions=768, host="http://10.10.128.140:11434")
         
         db_url = f"postgresql+psycopg://{kb_config['user']}:{kb_config['password']}@{kb_config['host']}:{kb_config['port']}/{kb_config['db']}"
         
