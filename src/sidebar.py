@@ -68,18 +68,48 @@ def render_sidebar(history_db: SqliteDb):
 
         # --- Knowledge Base Configuration ---
         with st.expander("Knowledge Base Configuration", expanded=False):
-            config["kb_type"] = st.selectbox("Knowledge Base Type", ("None", "PostgreSQL + PGVector"))
+            # We use a temporary variable for the selection
+            selected_kb_type = st.selectbox("Knowledge Base Type", ("None", "PostgreSQL + PGVector"))
             
-            if config["kb_type"] == "PostgreSQL + PGVector":
-                config["kb_config"] = {
-                    "host": st.text_input("PostgreSQL Host", value="localhost"),
-                    "port": st.text_input("PostgreSQL Port", value="5432"),
-                    "db": st.text_input("PostgreSQL Database", value="ai"),
-                    "user": st.text_input("PostgreSQL User", value="postgres"),
-                    "password": st.text_input("PostgreSQL Password", type="password", value="postgres"),
-                    "table_name": st.text_input("Table Name", value="vectors"),
-                    "knowledge_name": st.text_input("Knowledge name", value="PostgreSQL vector knowledge")
-                }
+            if selected_kb_type == "PostgreSQL + PGVector":
+                # Collect inputs but do NOT assign to config yet
+                kb_host = st.text_input("PostgreSQL Host", value="localhost")
+                kb_port = st.text_input("PostgreSQL Port", value="5432")
+                kb_db = st.text_input("PostgreSQL Database", value="ai")
+                kb_user = st.text_input("PostgreSQL User", value="postgres")
+                kb_password = st.text_input("PostgreSQL Password", type="password", value="123456")
+                kb_table = st.text_input("Table Name", value="vectors")
+                kb_name = st.text_input("Knowledge name", value="PostgreSQL vector knowledge")
+
+                # Confirm Button
+                if st.button("Confirm Knowledge Base", type="primary"):
+                    st.session_state['kb_confirmed_config'] = {
+                        "host": kb_host,
+                        "port": kb_port,
+                        "db": kb_db,
+                        "user": kb_user,
+                        "password": kb_password,
+                        "table_name": kb_table,
+                        "knowledge_name": kb_name
+                    }
+                    st.session_state['kb_active_type'] = selected_kb_type
+                    st.success("Knowledge Base Configured!")
+
+                # Logic to apply configuration only if confirmed
+                if st.session_state.get('kb_active_type') == "PostgreSQL + PGVector" and st.session_state.get('kb_confirmed_config'):
+                    config["kb_type"] = "PostgreSQL + PGVector"
+                    config["kb_config"] = st.session_state['kb_confirmed_config']
+                    st.caption("✅ KB Active")
+                else:
+                    # If selected in UI but not confirmed, treat as None for the backend
+                    config["kb_type"] = "None"
+                    st.warning("Click 'Confirm Knowledge Base' to initialize the database connection.")
+            else:
+                # If user selects None, reset
+                config["kb_type"] = "None"
+                # Optional: Clear confirmation if they switch back to None
+                if 'kb_active_type' in st.session_state and st.session_state['kb_active_type'] != "None":
+                    st.session_state['kb_active_type'] = "None"
 
         # --- Session History ---
         with st.expander("Session History", expanded=False):
@@ -139,7 +169,7 @@ def render_sidebar(history_db: SqliteDb):
             st.divider()
             config["use_marked_context"] = st.checkbox("Include MARKED messages as important context", value=True)
 
-        # --- Current Chat Navigation (Moved from main.py) ---
+        # --- Chat Navigation ---
         with st.expander("Current Chat", expanded=True):
             if st.session_state.get("history"):
                 st.caption("Jump / Mark Important:")
