@@ -42,9 +42,9 @@ def get_agent(model, instructions, kb_type, kb_config, session_id) -> Agent:
     if knowledge:
         knowledge_tools = KnowledgeTools(
             knowledge=knowledge,
-            enable_think=True,
+            enable_think=False,
             enable_search=True,
-            enable_analyze=True,
+            enable_analyze=False,
             add_few_shot=False,
         )
     
