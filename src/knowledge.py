@@ -4,7 +4,9 @@ from agno.vectordb.pgvector import PgVector
 from agno.db.postgres import PostgresDb
 from agno.knowledge.embedder.ollama import OllamaEmbedder
 from agno.utils.log import logger
+import streamlit as st
 
+@st.cache_resource
 def ensure_database_exists(kb_config: dict):
     """
     Checks if the target database exists. If not, creates it.
@@ -31,6 +33,7 @@ def ensure_database_exists(kb_config: dict):
                 logger.info(f"Database '{target_db}' created successfully.")
             else:
                 logger.info(f"Database '{target_db}' already exists.")
+        return True
     except Exception as e:
         logger.error(f"Failed to check/create database: {e}")
         raise e
@@ -38,11 +41,6 @@ def ensure_database_exists(kb_config: dict):
         engine.dispose()
 
 def setup_knowledge_base(kb_config: dict) -> Knowledge:
-    """
-    Initializes the Knowledge Base.
-    1. Ensures the PostgreSQL Database exists.
-    2. Ensures the Vector extension and Tables exist.
-    """
     
     # 1. Ensure the container Database exists
     ensure_database_exists(kb_config)
@@ -69,15 +67,6 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
         db_url=db_url,
         knowledge_table="knowledge_contents"
     )
-
-    # 6. Ensure Tables Exist
-    try:
-        # PgVector needs explicit creation to install the 'vector' extension
-        vector_db.create()
-        
-    except Exception as e:
-        logger.error(f"Vector Table initialization error: {e}")
-        raise e
 
     return Knowledge(
         vector_db=vector_db, 
