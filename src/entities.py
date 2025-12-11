@@ -24,7 +24,7 @@ def create_model(provider, **kwargs):
         st.error(f"Error creating model: {e}")
         return None
 
-@st.cache_resource
+# @st.cache_resource
 def get_knowledge(kb_type: str, kb_config: dict):
     """Creates and caches the knowledge base connection."""
     if kb_type == "PostgreSQL + PGVector":
