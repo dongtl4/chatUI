@@ -108,16 +108,17 @@ def render():
         for i, content in enumerate(contents):
             col_name, col_check = st.columns([4, 1])
             with col_name:
-                st.markdown(f"- **{content.name}** ({content.media_type})")
+                st.markdown(f"{content.name}")
             with col_check:
-                if st.button("❌", key=f"del_{i}"):
-                    try:
-                        with st.spinner(f"Deleting {content.name}..."):
-                            knowledge.remove_vector_by_id(content.id)
-                            knowledge.remove_content_by_id(content.id)
-                            st.rerun()
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+                with st.container(key=f"del_btn_wrap_{i}"):
+                    if st.button("❌", key=f"del_{i}"):
+                        try:
+                            with st.spinner(f"Deleting {content.name}..."):
+                                knowledge.remove_vector_by_id(content.id)
+                                knowledge.remove_content_by_id(content.id)
+                                st.rerun()
+                        except Exception as e:
+                            st.error(f"Error: {e}")
 
     # --- Clear Database ---
     if st.button("⚠️ Clear Entire Database"):
