@@ -2,6 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from uuid import uuid4
 import src.core.db as db_logic
+from agno.agent import Agent
 
 def scroll_to_anchor():
     """
@@ -57,7 +58,7 @@ def render_history_ui():
         with st.chat_message("assistant"):
             st.markdown(entry.get("assistant", "") or "_(no assistant message)_")
 
-def render(agent, history_db):
+def render(agent: Agent, history_db):
     """Main rendering entry point for chat."""
     st.header("💬 Chat Interface")
     

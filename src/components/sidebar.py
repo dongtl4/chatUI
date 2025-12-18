@@ -40,6 +40,10 @@ def render_sidebar(history_db):
         with st.expander("Current Conversation", expanded=True):
             if st.session_state.get("history"):
                 display_history = st.session_state.history
+                if st.button("🗑️ Delete Selected Chat", use_container_width=True):
+                    db_logic.delete_marked_exchanges(history_db, st.session_state.get("session_id"))
+                    st.session_state["history"] = []
+                    st.rerun()
                 for idx, item in enumerate(display_history):
                     c_mark, c_link = st.columns([0.2, 0.8])
                     with c_mark:

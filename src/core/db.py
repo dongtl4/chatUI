@@ -105,3 +105,12 @@ def delete_session(db, session_id: str):
             sess.commit()
     except Exception as e:
         print(f"Error deleting session: {e}")
+
+def delete_marked_exchanges(db, session_id: str):
+    """Deletes all marked exchanges for a session."""
+    try:
+        with db.Session() as sess:
+            sess.execute(text("DELETE FROM chat_exchanges WHERE session_id = :sid AND is_marked = 1"), {"sid": session_id})
+            sess.commit()
+    except Exception as e:
+        print(f"Error deleting marked exchanges: {e}")
