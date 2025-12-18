@@ -20,7 +20,7 @@ def render_sidebar(history_db):
             st.session_state["current_view"] = "chat_interface"
 
         # --- 1. Chat Expander ---
-        with st.expander("Chat", expanded=False):
+        with st.expander("Context", expanded=False):
             if st.button("⚙️ Context Settings", use_container_width=True):
                 st.session_state["current_view"] = "context_config"
 

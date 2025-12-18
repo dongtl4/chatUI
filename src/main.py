@@ -57,19 +57,19 @@ def main():
     # 6. Route Main View
     view = st.session_state.get("current_view", "chat_interface")
     
-    with st.container():
-        if view == "chat_interface":
-             chat.render(agent, history_db)
-        elif view == "context_config":
-            context_config.render(history_db)
-        elif view == "agent_config":
-            agent_config.render()
-        elif view == "knowledge_config":
-            knowledge_config.render()
-        elif view == "knowledge_ui":
-            knowledge_ui.render()
-        else:
-            st.error(f"Unknown view: {view}")
+
+    if view == "chat_interface":
+        chat.render(agent, history_db)
+    elif view == "context_config":
+        context_config.render(history_db)
+    elif view == "agent_config":
+        agent_config.render()
+    elif view == "knowledge_config":
+        knowledge_config.render()
+    elif view == "knowledge_ui":
+        knowledge_ui.render()
+    else:
+        st.error(f"Unknown view: {view}")
 
 if __name__ == "__main__":
     main()

@@ -4,11 +4,19 @@ from uuid import uuid4
 import src.core.db as db_logic
 
 def scroll_to_anchor():
+    """
+    Injects JS to scroll specifically to the 'current_response_anchor' element.
+    This is more reliable than scrolling to the bottom of the page.
+    """
     js = """
     <script>
+        // Wait slightly for the DOM to update
         setTimeout(function() {
+            // Target the specific anchor ID we placed in the app
             var element = window.parent.document.getElementById('current_response_anchor');
             if (element) {
+                // Scroll the element into view. 
+                // 'block: start' tries to align the top of the element with the top of the viewport
                 element.scrollIntoView({behavior: 'smooth', block: 'start'});
             }
         }, 100);
