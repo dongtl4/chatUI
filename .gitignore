@@ -1,0 +1,10 @@
+etc/*
+include/*
+Lib/*
+Scripts/*
+share/*
+src_past/*
+tmp/*
+*.lock
+*.TAG
+*.cfg
