@@ -8,3 +8,5 @@ tmp/*
 *.lock
 *.TAG
 *.cfg
+*.log
+test*.py
