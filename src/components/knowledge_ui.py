@@ -93,42 +93,57 @@ def render():
         contents = []
 
     if contents:
-        # Custom CSS for compact delete buttons
+        # Column headers
+        h_col1, h_col2 = st.columns([0.5, 6])
+        with h_col1:
+            st.markdown("**Sel**")
+        with h_col2:
+            st.markdown("**Document Name**")
+
+        
         st.markdown("""
             <style>
-                div[class*="st-key-del_btn_wrap_"] button {
-                    padding: 0px 5px !important;
-                    min-height: 0px !important;
-                    height: auto !important;
-                    line-height: 1 !important;
-                    margin-top: 5px !important;
-                    border: none !important;
+                div[class*="st-key-knowledge_management_checkboxes_container_"] div[data-testid="stCheckbox"] {
+                    margin-top: 0px !important;
                 }
             </style>
             """, unsafe_allow_html=True)
-            
-        for i, content in enumerate(contents):
-            col_name, col_check = st.columns([4, 1])
-            with col_name:
-                st.markdown(f"{content.name}")
+        # Display list with checkboxes [Check | Name]
+        for content in contents:
+            col_check, col_name = st.columns([0.5, 6])
             with col_check:
-                with st.container(key=f"del_btn_wrap_{i}"):
-                    if st.button("❌", key=f"del_{i}"):
-                        try:
-                            with st.spinner(f"Deleting {content.name}..."):
-                                # knowledge.remove_vector_by_id(content.id)
-                                knowledge.remove_content_by_id(content.id)
-                                st.rerun()
-                        except Exception as e:
-                            st.error(f"Error: {e}")
+                with st.container(key=f"knowledge_management_checkboxes_container_{content.id}"):
+                    st.checkbox("select box", key=f"sel_{content.id}", label_visibility="collapsed")
+            with col_name:
+                st.write(content.name)
+        
+        st.write("") # Add a little spacing
+        
+        # --- Delete Selected Button ---
+        if st.button("🗑️ Delete Selected", type="primary"):
+            # Identify which items were selected
+            selected_items = [c for c in contents if st.session_state.get(f"sel_{c.id}")]
+            
+            if not selected_items:
+                st.warning("Please select at least one document to delete.")
+            else:
+                try:
+                    with st.spinner(f"Deleting {len(selected_items)} documents..."):
+                        for item in selected_items:
+                            knowledge.remove_content_by_id(item.id)
+                    st.success("Selected documents deleted successfully!")
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Error deleting documents: {e}")
 
-    # --- Clear Database ---
+    # --- Clear Entire Database ---
+    # Kept this utility as a fallback for clearing everything
     if st.button("⚠️ Clear Entire Database"):
         try:
             with st.spinner("Clearing database..."):
-                contents, _ = knowledge.contents_db.get_knowledge_contents()
-                for content in contents:
-                    # knowledge.remove_vector_by_id(content.id)
+                # Re-fetch contents to ensure we have the latest list
+                contents_to_clear, _ = knowledge.contents_db.get_knowledge_contents()
+                for content in contents_to_clear:
                     knowledge.remove_content_by_id(content.id)
                 st.success("Knowledge base cleared!")
                 st.rerun()
