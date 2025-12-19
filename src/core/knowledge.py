@@ -3,7 +3,8 @@ from agno.knowledge import Knowledge
 from agno.vectordb.pgvector import PgVector
 from agno.db.postgres import PostgresDb
 from agno.knowledge.embedder.ollama import OllamaEmbedder
-from agno.utils.log import logger
+from agno.vectordb.search import SearchType
+# from agno.utils.log import logger
 import streamlit as st
 
 @st.cache_resource
@@ -39,6 +40,7 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
     vector_db = PgVector(
         table_name=kb_config['table_name'],
         db_url=db_url,
+        search_type=SearchType.hybrid,
         embedder=embedder,
     )
 

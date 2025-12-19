@@ -2,6 +2,7 @@ import streamlit as st
 import pathlib
 import src.core.knowledge as kb_logic
 import src.core.db as db_logic
+from agno.filters import AND, EQ, IN, NOT
 from uuid import uuid4
 
 def render(history_db=None):
@@ -217,3 +218,28 @@ def render(history_db=None):
                 st.rerun()
         except Exception as e:
             st.error(f"Error clearing database: {e}")
+
+    st.divider()
+    st.subheader("Quick Test Query 🔍")
+    st.checkbox("Use custom RAG filtering based on marked documents", key="use_knowledge_filter", value=False)
+    test_query = st.text_input("Enter a test query to validate knowledge integration")
+    if st.button("Run Test Query"):
+        if not test_query.strip():
+            st.warning("Please enter a valid query.")
+        else:
+            try:
+                filters = [IN("metaid", marked_metaids)] if marked_metaids else None
+                with st.spinner(f"Running test query for '{test_query}'..."):
+                    response = knowledge.vector_db.search(
+                        query=test_query,
+                        limit=5,
+                        filters=filters if st.session_state["use_knowledge_filter"] else None,
+                    )
+                    st.markdown(f"**Response for query '{test_query}':**")
+                    for res in response:
+                        st.write(f"- Name: {res.name}")
+                        st.write(f"  - Content (truncated): {res.content[:500]}...")
+                        st.write(f"  - Metadata: {res.meta_data}")
+                        st.write("-----")
+            except Exception as e:
+                st.error(f"Error during test query: {e}")
