@@ -44,21 +44,29 @@ def render_sidebar(history_db):
                     db_logic.delete_marked_exchanges(history_db, st.session_state.get("session_id"))
                     st.session_state["history"] = []
                     st.rerun()
+                st.markdown("""
+                    <style>
+                        div[class*="st-key-mark_container_"] div[data-testid="stCheckbox"] {
+                            margin-top: 0px !important;
+                        }
+                    </style>
+                    """, unsafe_allow_html=True)
                 for idx, item in enumerate(display_history):
                     c_mark, c_link = st.columns([0.2, 0.8])
                     with c_mark:
                         msg_id = item.get("id")
                         if msg_id:
-                            is_marked = st.checkbox(
-                                "Mark", 
-                                value=item.get("marked", False), 
-                                key=f"mark_chk_{msg_id}", 
-                                label_visibility="collapsed"
-                            )
-                            if is_marked != item.get("marked", False):
-                                db_logic.toggle_exchange_marker(history_db, msg_id, is_marked)
-                                item["marked"] = is_marked
-                                st.rerun()
+                            with st.container(key=f"mark_container_{msg_id}"):
+                                is_marked = st.checkbox(
+                                    "Mark", 
+                                    value=item.get("marked", False), 
+                                    key=f"mark_chk_{msg_id}", 
+                                    label_visibility="collapsed"
+                                )
+                                if is_marked != item.get("marked", False):
+                                    db_logic.toggle_exchange_marker(history_db, msg_id, is_marked)
+                                    item["marked"] = is_marked
+                                    st.rerun()
                     with c_link:
                         user_text = item.get("user", "")
                         label = (user_text[:20] + '...') if len(user_text) > 20 else user_text or f"Msg {idx+1}"

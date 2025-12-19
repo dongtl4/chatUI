@@ -1,6 +1,7 @@
 import streamlit as st
 import pathlib
 import src.core.knowledge as kb_logic
+from uuid import uuid4
 
 def render():
     st.header("📚 Knowledge File Management")
@@ -59,10 +60,11 @@ def render():
                         temp_path = pathlib.Path("tmp") / file.name
                         with open(temp_path, "wb") as f:
                             f.write(file.getbuffer())
-                        
+                        metaid = str(uuid4())
                         contents_to_add.append({
                             "path": str(temp_path),
-                            "name": file.name
+                            "name": file.name,
+                            "metadata": {"metaid": metaid},
                         })
                         temp_paths.append(temp_path)
 
@@ -75,7 +77,7 @@ def render():
                             if path.exists(): path.unlink()
                                 
                     except Exception as e:
-                        st.error(f"❌ Error adding files: {e}")
+                        st.error(f"Error adding files: {e}")
                     
                     st.session_state["file_uploader_key"] += 1
                     st.rerun()
@@ -114,7 +116,7 @@ def render():
                     if st.button("❌", key=f"del_{i}"):
                         try:
                             with st.spinner(f"Deleting {content.name}..."):
-                                knowledge.remove_vector_by_id(content.id)
+                                # knowledge.remove_vector_by_id(content.id)
                                 knowledge.remove_content_by_id(content.id)
                                 st.rerun()
                         except Exception as e:
@@ -126,7 +128,7 @@ def render():
             with st.spinner("Clearing database..."):
                 contents, _ = knowledge.contents_db.get_knowledge_contents()
                 for content in contents:
-                    knowledge.remove_vector_by_id(content.id)
+                    # knowledge.remove_vector_by_id(content.id)
                     knowledge.remove_content_by_id(content.id)
                 st.success("Knowledge base cleared!")
                 st.rerun()
