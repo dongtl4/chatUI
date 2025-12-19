@@ -98,10 +98,13 @@ def load_history_from_db(db, session_id: str):
     return history
 
 def delete_session(db, session_id: str):
-    """Deletes a session from the DB."""
+    """Deletes a session (chat history and associated documents) from the DB."""
     try:
         with db.Session() as sess:
-            sess.execute(text("DELETE FROM chat_exchanges WHERE session_id = :sid"), {"sid": session_id})
+            # 1. Delete the chat history
+            sess.execute(text("DELETE FROM chat_exchanges WHERE session_id = :sid"), {"sid": session_id}) 
+            # 2. Delete the associated marked documents configuration
+            sess.execute(text("DELETE FROM session_documents WHERE session_id = :sid"), {"sid": session_id})            
             sess.commit()
     except Exception as e:
         print(f"Error deleting session: {e}")
@@ -114,3 +117,65 @@ def delete_marked_exchanges(db, session_id: str):
             sess.commit()
     except Exception as e:
         print(f"Error deleting marked exchanges: {e}")
+
+# --- DOCUMENT MANAGEMENT ---
+
+def ensure_session_docs_table(sess):
+    create_table_sql = """
+    CREATE TABLE IF NOT EXISTS session_documents (
+        session_id TEXT,
+        metaid TEXT,
+        PRIMARY KEY (session_id, metaid)
+    );
+    """
+    sess.execute(text(create_table_sql))
+
+def save_session_documents(db, session_id: str, metaids: list):
+    """Saves the list of marked document metaids for a session (Full Refresh)."""
+    if not db or not session_id:
+        return
+
+    try:
+        with db.Session() as sess:
+            ensure_session_docs_table(sess)
+            
+            # Clear existing selection for this session
+            sess.execute(text("DELETE FROM session_documents WHERE session_id = :sid"), {"sid": session_id})
+            
+            # Insert new selection
+            if metaids:
+                insert_sql = "INSERT INTO session_documents (session_id, metaid) VALUES (:sid, :mid)"
+                for mid in metaids:
+                    sess.execute(text(insert_sql), {"sid": session_id, "mid": mid})
+            
+            sess.commit()
+    except Exception as e:
+        print(f"Error saving session documents: {e}")
+
+def get_session_documents(db, session_id: str) -> list:
+    """Retrieves the list of metaids associated with a session."""
+    if not db or not session_id:
+        return []
+
+    try:
+        with db.Session() as sess:
+            ensure_session_docs_table(sess)
+            sql = text("SELECT metaid FROM session_documents WHERE session_id = :sid")
+            rows = sess.execute(sql, {"sid": session_id}).fetchall()
+            return [row[0] for row in rows]
+    except Exception as e:
+        print(f"Error loading session documents: {e}")
+        return []
+
+def remove_document_from_usages(db, metaid: str):
+    """Removes a document from ALL sessions (used when file is deleted)."""
+    if not db or not metaid:
+        return
+        
+    try:
+        with db.Session() as sess:
+            ensure_session_docs_table(sess)
+            sess.execute(text("DELETE FROM session_documents WHERE metaid = :mid"), {"mid": metaid})
+            sess.commit()
+    except Exception as e:
+        print(f"Error removing document usages: {e}")

@@ -67,7 +67,7 @@ def main():
     elif view == "knowledge_config":
         knowledge_config.render()
     elif view == "knowledge_ui":
-        knowledge_ui.render()
+        knowledge_ui.render(history_db)
     else:
         st.error(f"Unknown view: {view}")
 

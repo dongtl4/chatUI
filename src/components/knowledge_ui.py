@@ -1,17 +1,21 @@
 import streamlit as st
 import pathlib
 import src.core.knowledge as kb_logic
+import src.core.db as db_logic
 from uuid import uuid4
 
-def render():
+def render(history_db=None):
     st.header("📚 Knowledge File Management")
+
+    if history_db is None:
+        history_db = db_logic.get_db()
 
     # Verify connection first
     if st.session_state.get('kb_active_type') != "PostgreSQL + PGVector" or not st.session_state.get('kb_confirmed_config'):
         st.error("Please configure the PostgreSQL connection in 'Connect Database' first.")
         return
 
-    # Initialize KB Connection just for this view
+    # Initialize KB Connection
     try:
         knowledge = kb_logic.setup_knowledge_base(st.session_state['kb_confirmed_config'])
     except Exception as e:
@@ -85,22 +89,29 @@ def render():
     st.divider()
     st.subheader("🗄️ Stored Knowledge")
     
-    # --- List & Delete ---
+    # --- Fetch Content List ---
     try:
         contents, _ = knowledge.contents_db.get_knowledge_contents()
     except Exception as e:
         st.error(f"Error fetching knowledge contents: {e}")
         contents = []
 
+    # --- Fetch Marked Docs for Session ---
+    current_session_id = st.session_state.get("session_id")
+    marked_metaids = []
+    if current_session_id:
+        marked_metaids = db_logic.get_session_documents(history_db, current_session_id)
+
     if contents:
         # Column headers
-        h_col1, h_col2 = st.columns([0.5, 6])
-        with h_col1:
-            st.markdown("**Sel**")
-        with h_col2:
+        mark_col, del_col, name_col = st.columns([1, 1, 6])
+        with mark_col:
+            st.markdown("**Mark Sel**")
+        with del_col:
+            st.markdown("**Del Sel**")
+        with name_col:
             st.markdown("**Document Name**")
 
-        
         st.markdown("""
             <style>
                 div[class*="st-key-knowledge_management_checkboxes_container_"] div[data-testid="stCheckbox"] {
@@ -108,42 +119,99 @@ def render():
                 }
             </style>
             """, unsafe_allow_html=True)
-        # Display list with checkboxes [Check | Name]
+        
+        # Display list with checkboxes
         for content in contents:
-            col_check, col_name = st.columns([0.5, 6])
-            with col_check:
-                with st.container(key=f"knowledge_management_checkboxes_container_{content.id}"):
-                    st.checkbox("select box", key=f"sel_{content.id}", label_visibility="collapsed")
+            col_mark, col_del, col_name = st.columns([1, 1, 6])
+            
+            # --- 1. Mark Column ---
+            with col_mark:
+                content_metaid = content.metadata.get("metaid") if content.metadata else None
+                is_checked = (content_metaid in marked_metaids) if content_metaid else False
+                
+                # Key: sel_{id}_{session}
+                chk_key = f"sel_{content.id}_{current_session_id}"
+                
+                with st.container(key=f"knowledge_management_checkboxes_container_{chk_key}_mark"):
+                    if current_session_id and content_metaid:
+                        st.checkbox("select box", value=is_checked, key=chk_key, label_visibility="collapsed")
+                    else:
+                        st.checkbox("select box", value=False, key=chk_key, label_visibility="collapsed", disabled=True)
+            
+            # --- 2. Delete Column ---
+            with col_del:
+                # Key: del_sel_{id}_{session} 
+                del_key = f"del_{chk_key}"
+                with st.container(key=f"knowledge_management_checkboxes_container_{chk_key}_del"):
+                    st.checkbox("select box", value=False, key=del_key, label_visibility="collapsed")
+            
+            # --- 3. Name Column ---
             with col_name:
                 st.write(content.name)
         
-        st.write("") # Add a little spacing
+        st.write("") 
         
-        # --- Delete Selected Button ---
-        if st.button("🗑️ Delete Selected", type="primary"):
-            # Identify which items were selected
-            selected_items = [c for c in contents if st.session_state.get(f"sel_{c.id}")]
-            
-            if not selected_items:
-                st.warning("Please select at least one document to delete.")
-            else:
-                try:
-                    with st.spinner(f"Deleting {len(selected_items)} documents..."):
-                        for item in selected_items:
-                            knowledge.remove_content_by_id(item.id)
-                    st.success("Selected documents deleted successfully!")
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Error deleting documents: {e}")
+        c_mark, c_del = st.columns(2)
 
-    # --- Clear Entire Database ---
-    # Kept this utility as a fallback for clearing everything
+        # --- Button 1: Mark Selected Documents ---
+        with c_mark:
+            if st.button("📌 Mark Selected Documents for Custom RAG"):
+                if not current_session_id:
+                    st.error("No active session found.")
+                else:
+                    selected_metaids = []
+                    for content in contents:
+                        chk_key = f"sel_{content.id}_{current_session_id}"
+                        # Check the Mark checkbox state
+                        if st.session_state.get(chk_key):
+                            metaid = content.metadata.get("metaid")
+                            if metaid:
+                                selected_metaids.append(metaid)
+                    
+                    db_logic.save_session_documents(history_db, current_session_id, selected_metaids)
+                    st.success(f"Marked {len(selected_metaids)} documents for session '{current_session_id}'!")
+                    st.rerun()
+
+        # --- Button 2: Delete Selected Documents ---
+        with c_del:
+            if st.button("🗑️ Delete Selected from KB"):
+                selected_items_to_del = []
+                for content in contents:
+                    chk_key = f"sel_{content.id}_{current_session_id}"
+                    del_key = f"del_{chk_key}"
+                    
+                    # Check the DELETE checkbox state
+                    if st.session_state.get(del_key):
+                        selected_items_to_del.append(content)
+                
+                if not selected_items_to_del:
+                    st.warning("Please select at least one document to delete.")
+                else:
+                    try:
+                        with st.spinner(f"Deleting {len(selected_items_to_del)} documents..."):
+                            for item in selected_items_to_del:
+                                metaid = item.metadata.get("metaid")
+                                # 1. Remove from usages DB (This effectively "unpresses" the mark button)
+                                if metaid:
+                                    db_logic.remove_document_from_usages(history_db, metaid)
+                                
+                                # 2. Remove from actual Knowledge Base
+                                knowledge.remove_content_by_id(item.id)
+                        
+                        st.success("Selected documents deleted successfully!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error deleting documents: {e}")
+
+    # --- Clear Database Utility ---
     if st.button("⚠️ Clear Entire Database"):
         try:
             with st.spinner("Clearing database..."):
-                # Re-fetch contents to ensure we have the latest list
                 contents_to_clear, _ = knowledge.contents_db.get_knowledge_contents()
                 for content in contents_to_clear:
+                    metaid = content.metadata.get("metaid")
+                    if metaid:
+                        db_logic.remove_document_from_usages(history_db, metaid)
                     knowledge.remove_content_by_id(content.id)
                 st.success("Knowledge base cleared!")
                 st.rerun()
