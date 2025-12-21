@@ -23,6 +23,7 @@ def main():
     # We let each component decide its default state based on env vars
     context_config.auto_initialize()
     knowledge_config.auto_initialize()
+    knowledge_ui.auto_initialize(history_db)
     agent_config.auto_initialize()
 
     # 2. Global State Safety Checks

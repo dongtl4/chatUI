@@ -102,7 +102,6 @@ def render(agent: Agent, history_db):
                 existing_history = st.session_state["history"][:-1]
                 for msg in existing_history:
                     if msg.get("marked", False):
-                        print("marked context:", msg)
                         marked_context_str += f"User: {msg['user']}\nAssistant: {msg['assistant']}\n---\n"
                 if marked_context_str:
                     final_prompt += f"!!! IMPORTANT CONTEXT !!!\n{marked_context_str}\n!!! END CONTEXT !!!\n\n"
@@ -128,7 +127,7 @@ def render(agent: Agent, history_db):
                     st.session_state["current_chat"][-1]["assistant"] = full_response
                     render_current_chat_container(current_chat_placeholder)
                 else:
-                    for chunk in agent.run(final_prompt, stream=True):
+                    for chunk in agent.run(final_prompt, stream=True, knowledge_filters=st.session_state.get("knowledge_filters", None)):
                         if hasattr(chunk, 'event') and chunk.event == "RunContent":
                             if hasattr(chunk, 'content') and chunk.content:
                                 full_response += chunk.content

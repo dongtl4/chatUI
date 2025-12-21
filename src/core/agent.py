@@ -29,18 +29,7 @@ def get_knowledge(kb_type: str, kb_config: dict):
     return None
 
 def get_agent(model, instructions, kb_type, kb_config, session_id) -> Agent:
-    knowledge = get_knowledge(kb_type, kb_config)
-    
-    knowledge_tools = None
-    if knowledge:
-        knowledge_tools = KnowledgeTools(
-            knowledge=knowledge,
-            enable_think=False,
-            enable_search=True,
-            enable_analyze=False,
-            add_few_shot=False,
-        )
-    
+    knowledge = get_knowledge(kb_type, kb_config)   
     if not session_id:
         new_sid = str(uuid4())
         st.session_state['session_id'] = new_sid
@@ -48,7 +37,8 @@ def get_agent(model, instructions, kb_type, kb_config, session_id) -> Agent:
 
     return Agent(
         model=model,
-        tools=[knowledge_tools] if knowledge_tools else [],
+        knowledge=knowledge,
+        search_knowledge=True,
         instructions=instructions.splitlines(),
         session_id=session_id,
         markdown=True,

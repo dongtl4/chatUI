@@ -5,6 +5,29 @@ import src.core.db as db_logic
 from agno.filters import AND, EQ, IN, NOT
 from uuid import uuid4
 
+def auto_initialize(history_db):
+    """
+    Initializes the knowledge_filters session state based on the current session's marked documents in the database.
+    """
+    # Only initialize if it doesn't exist yet
+    if "knowledge_filters" not in st.session_state:
+        st.session_state["knowledge_filters"] = None
+        
+    # Sync with DB
+    session_id = st.session_state.get("session_id")
+    if session_id and history_db:
+        try:
+            marked_ids = db_logic.get_session_documents(history_db, session_id)
+            if marked_ids:
+                st.session_state["knowledge_filters"] = [IN("metaid", marked_ids)]
+            else:
+                st.session_state["knowledge_filters"] = None
+        except Exception:
+            # On error (e.g. DB not ready), default to None
+            st.session_state["knowledge_filters"] = None
+    else:
+        st.session_state["knowledge_filters"] = None
+
 def render(history_db=None):
     st.header("📚 Knowledge File Management")
 
@@ -102,6 +125,12 @@ def render(history_db=None):
     marked_metaids = []
     if current_session_id:
         marked_metaids = db_logic.get_session_documents(history_db, current_session_id)
+
+    # --- Update Knowledge Filters based on Marked Docs ---
+    if marked_metaids:
+        st.session_state["knowledge_filters"] = [IN("metaid", marked_metaids)]
+    else:
+        st.session_state["knowledge_filters"] = None
 
     if contents:
         # Column headers
@@ -228,12 +257,14 @@ def render(history_db=None):
             st.warning("Please enter a valid query.")
         else:
             try:
-                filters = [IN("metaid", marked_metaids)] if marked_metaids else None
+                # Use the session state knowledge filters if the checkbox is checked
+                active_filters = st.session_state["knowledge_filters"] if st.session_state.get("use_knowledge_filter") else None
+                
                 with st.spinner(f"Running test query for '{test_query}'..."):
                     response = knowledge.vector_db.search(
                         query=test_query,
                         limit=5,
-                        filters=filters if st.session_state["use_knowledge_filter"] else None,
+                        filters=active_filters,
                     )
                     st.markdown(f"**Response for query '{test_query}':**")
                     for res in response:
