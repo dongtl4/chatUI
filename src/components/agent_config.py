@@ -64,90 +64,80 @@ def auto_initialize():
 
 def render():
     """Renders the Configuration UI based on stored session state."""
-    st.header("🤖 Agent Configuration")
+    st.subheader(body="🤖 Agent Configuration")
+    with st.expander(label="⚙️ Model Parameters"):
     
-    current_model = st.session_state.get('model')
-    if current_model:
-        st.success(f"✅ Active Model: **{current_model.name}** ({current_model.id})")
-    else:
-        st.warning("No model currently active. Please configure below.")
-
-    st.divider()
-
-    # --- 1. Model Provider Settings ---
-    current_params = st.session_state["agent_params"]
-    options = ["OpenAI", "DeepSeek", "Ollama"]
-    
-    try:
-        current_index = options.index(current_params.get("provider", "Ollama"))
-    except ValueError:
-        current_index = 2 
+        # --- 1. Model Provider Settings ---
+        current_params = st.session_state["agent_params"]
+        options = ["OpenAI", "DeepSeek", "Ollama"]
         
-    selected_provider = st.selectbox("Switch Provider", options, index=current_index)
-    
-    # Defaults logic for UI inputs
-    input_defaults = {}
-    if selected_provider == current_params.get("provider"):
-        input_defaults = current_params
-    else:
-        if selected_provider == "OpenAI":
-            input_defaults = {"id": "gpt-4o", "name": "OpenAI Agent", "api_key": ""}
-        elif selected_provider == "DeepSeek":
-            input_defaults = {"id": "deepseek-chat", "name": "DeepSeek Agent", "api_key": ""}
+        try:
+            current_index = options.index(current_params.get("provider", "Ollama"))
+        except ValueError:
+            current_index = 2 
+            
+        selected_provider = st.selectbox("Switch Provider", options, index=current_index)
+        
+        # Defaults logic for UI inputs
+        input_defaults = {}
+        if selected_provider == current_params.get("provider"):
+            input_defaults = current_params
+        else:
+            if selected_provider == "OpenAI":
+                input_defaults = {"id": "gpt-4o", "name": "OpenAI Agent", "api_key": ""}
+            elif selected_provider == "DeepSeek":
+                input_defaults = {"id": "deepseek-chat", "name": "DeepSeek Agent", "api_key": ""}
+            elif selected_provider == "Ollama":
+                input_defaults = {"host": "http://10.10.128.140:11434", "id": "llama3.2", "name": "Ollama Agent"}
+
+        new_params = {"provider": selected_provider}
+        
+        if selected_provider in ["OpenAI", "DeepSeek"]:
+            new_params["api_key"] = st.text_input(f"{selected_provider} API Key", value=input_defaults.get("api_key", ""), type="password")
+            new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", ""))
+            new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", ""))
         elif selected_provider == "Ollama":
-            input_defaults = {"host": "http://10.10.128.140:11434", "id": "llama3.2", "name": "Ollama Agent"}
+            new_params["host"] = st.text_input("Host", value=input_defaults.get("host", "http://10.10.128.140:11434"))
+            new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", "llama3.2"))
+            new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", "Ollama Agent"))
 
-    new_params = {"provider": selected_provider}
-    
-    if selected_provider in ["OpenAI", "DeepSeek"]:
-        new_params["api_key"] = st.text_input(f"{selected_provider} API Key", value=input_defaults.get("api_key", ""), type="password")
-        new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", ""))
-        new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", ""))
-    elif selected_provider == "Ollama":
-        new_params["host"] = st.text_input("Host", value=input_defaults.get("host", "http://10.10.128.140:11434"))
-        new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", "llama3.2"))
-        new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", "Ollama Agent"))
-
-    st.divider()
     
     # --- 2. System Prompt Configuration ---
-    st.subheader("📝 System Prompt Settings")
+    with st.expander(label="📝 System Prompt Settings"):
     
-    current_prompt = st.session_state["system_prompt"]
-    
-    # Description
-    new_description = st.text_area(
-        "Description (A description of the Agent, added at the start of the system message)", 
-        value=current_prompt.get("description", ""),
-        height=70
-    )
-    
-    # Instructions
-    # Convert list back to string for editing
-    instructions_list = current_prompt.get("instructions", [])
-    instructions_str = "\n".join(instructions_list) if isinstance(instructions_list, list) else str(instructions_list)
-    
-    new_instructions_str = st.text_area(
-        "Instructions (List of instructions added to the system prompt in <instructions> tags)", 
-        value=instructions_str,
-        height=150
-    )
-    
-    # Additional Context
-    new_context = st.text_area(
-        "Additional Context (Additional context added to end of system message)", 
-        value=current_prompt.get("additional_context", ""),
-        height=70
-    )
-    
-    # Expected Output
-    new_output = st.text_area(
-        "Expected Output (Provide the expected output from the Agent, added to end of system message)", 
-        value=current_prompt.get("expected_output", ""),
-        height=70
-    )
-
-    st.divider()
+        current_prompt = st.session_state["system_prompt"]
+        
+        # Description
+        new_description = st.text_area(
+            "Description (A description of the Agent, added at the start of the system message)", 
+            value=current_prompt.get("description", ""),
+            height=70
+        )
+        
+        # Instructions
+        # Convert list back to string for editing
+        instructions_list = current_prompt.get("instructions", [])
+        instructions_str = "\n".join(instructions_list) if isinstance(instructions_list, list) else str(instructions_list)
+        
+        new_instructions_str = st.text_area(
+            "Instructions (List of instructions added to the system prompt in <instructions> tags)", 
+            value=instructions_str,
+            height=150
+        )
+        
+        # Additional Context
+        new_context = st.text_area(
+            "Additional Context (Additional context added to end of system message)", 
+            value=current_prompt.get("additional_context", ""),
+            height=150
+        )
+        
+        # Expected Output
+        new_output = st.text_area(
+            "Expected Output (Provide the expected output from the Agent)", 
+            value=current_prompt.get("expected_output", ""),
+            height=100
+        )
 
     # --- 3. Update Logic ---
     if st.button("Update Agent Settings", type="primary"):
