@@ -1,4 +1,5 @@
 import time
+import json
 from sqlalchemy import text
 from agno.db.sqlite import SqliteDb
 
@@ -179,3 +180,75 @@ def remove_document_from_usages(db, metaid: str):
             sess.commit()
     except Exception as e:
         print(f"Error removing document usages: {e}")
+
+# --- AGENT CONFIGURATION MANAGEMENT ---
+
+def ensure_agent_configs_table(sess):
+    create_table_sql = """
+    CREATE TABLE IF NOT EXISTS agent_configs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT,
+        config_json TEXT,
+        timestamp INTEGER
+    );
+    """
+    sess.execute(text(create_table_sql))
+
+def save_agent_config(db, name: str, config_data: dict):
+    """Saves the current agent configuration (params + prompt)."""
+    if not db or not name:
+        return False
+    
+    try:
+        with db.Session() as sess:
+            ensure_agent_configs_table(sess)
+            # Check if name exists to update or insert new (optional, here we just insert new for history)
+            # For simplicity, let's just insert a new record. 
+            # If you want unique names, you'd check first.
+            
+            insert_sql = """
+            INSERT INTO agent_configs (name, config_json, timestamp)
+            VALUES (:name, :config_json, :timestamp)
+            """
+            sess.execute(text(insert_sql), {
+                "name": name,
+                "config_json": json.dumps(config_data),
+                "timestamp": int(time.time())
+            })
+            sess.commit()
+        return True
+    except Exception as e:
+        print(f"Error saving agent config: {e}")
+        return False
+
+def list_agent_configs(db):
+    """Returns a list of saved agent configurations."""
+    configs = []
+    if not db:
+        return configs
+        
+    try:
+        with db.Session() as sess:
+            ensure_agent_configs_table(sess)
+            sql = text("SELECT id, name, config_json, timestamp FROM agent_configs ORDER BY timestamp DESC")
+            rows = sess.execute(sql).fetchall()
+            for row in rows:
+                configs.append({
+                    "id": row[0],
+                    "name": row[1],
+                    "config": json.loads(row[2]),
+                    "timestamp": row[3]
+                })
+    except Exception as e:
+        print(f"Error listing agent configs: {e}")
+    return configs
+
+def delete_agent_config(db, config_id: int):
+    """Deletes a specific agent configuration."""
+    try:
+        with db.Session() as sess:
+            ensure_agent_configs_table(sess)
+            sess.execute(text("DELETE FROM agent_configs WHERE id = :id"), {"id": config_id})
+            sess.commit()
+    except Exception as e:
+        print(f"Error deleting agent config: {e}")

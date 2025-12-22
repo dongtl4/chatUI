@@ -14,7 +14,8 @@ def render_sidebar(history_db):
         st.header("NAVIGATION")
         if st.session_state.get("session_id"):
             st.caption(f"Session: {st.session_state.get('session_id')}")
-        st.divider()
+        if st.session_state.get("model_params"):
+            st.caption(f"Current model: {st.session_state.model_params["provider"]}---{st.session_state.model_params["id"]}")
 
         if st.button("💬 Chat Interface", use_container_width=True):
             st.session_state["current_view"] = "chat_interface"

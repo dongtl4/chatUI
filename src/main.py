@@ -2,7 +2,7 @@ import streamlit as st
 from dotenv import load_dotenv
 
 # Logic imports
-from components import session_config
+from src.components import session_config
 from src.core import db as db_logic
 from src.core import agent as agent_logic
 
@@ -24,7 +24,7 @@ def main():
     session_config.auto_initialize()
     knowledge_config.auto_initialize()
     knowledge_ui.auto_initialize(history_db)
-    agent_config.auto_initialize() # This now inits "system_prompt" dict
+    agent_config.auto_initialize() 
 
     # 2. Global State Safety Checks
     if "current_view" not in st.session_state:
