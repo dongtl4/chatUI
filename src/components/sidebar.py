@@ -19,10 +19,10 @@ def render_sidebar(history_db):
         if st.button("💬 Chat Interface", use_container_width=True):
             st.session_state["current_view"] = "chat_interface"
 
-        # --- 1. Chat Expander ---
-        with st.expander("Context", expanded=False):
-            if st.button("⚙️ Context Settings", use_container_width=True):
-                st.session_state["current_view"] = "context_config"
+        # --- 1. Session Expander ---
+        with st.expander("Session", expanded=False):
+            if st.button("⚙️ Session Settings", use_container_width=True):
+                st.session_state["current_view"] = "session_config"
 
         # --- 2. Agent Expander ---
         with st.expander("Agent", expanded=False):

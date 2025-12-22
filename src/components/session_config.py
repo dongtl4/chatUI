@@ -21,12 +21,12 @@ def auto_initialize():
         st.session_state["history"] = []
 
 def render(history_db):
-    st.header("⚙️ Context & Session Management")
+    st.header("⚙️ History & Session Management")
 
     col_hist, col_sess = st.columns(2)
 
     with col_hist:
-        st.subheader("Context Settings")
+        st.subheader("History Chat Settings")
         st.session_state["use_history"] = st.checkbox("Use chat history for context", value=False)
         
         if st.session_state.get("use_history"):

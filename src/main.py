@@ -2,11 +2,12 @@ import streamlit as st
 from dotenv import load_dotenv
 
 # Logic imports
+from components import session_config
 from src.core import db as db_logic
 from src.core import agent as agent_logic
 
 # Component imports
-from src.components import sidebar, chat, agent_config, context_config, knowledge_config, knowledge_ui
+from src.components import sidebar, chat, agent_config, knowledge_config, knowledge_ui
 
 # Load environment variables
 load_dotenv()
@@ -21,7 +22,7 @@ history_db = db_logic.get_db(DB_FILE)
 def main():
     # 1. Component Auto-Initialization
     # We let each component decide its default state based on env vars
-    context_config.auto_initialize()
+    session_config.auto_initialize()
     knowledge_config.auto_initialize()
     knowledge_ui.auto_initialize(history_db)
     agent_config.auto_initialize()
@@ -61,8 +62,8 @@ def main():
 
     if view == "chat_interface":
         chat.render(agent, history_db)
-    elif view == "context_config":
-        context_config.render(history_db)
+    elif view == "session_config":
+        session_config.render(history_db)
     elif view == "agent_config":
         agent_config.render()
     elif view == "knowledge_config":
