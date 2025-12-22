@@ -24,11 +24,14 @@ def get_knowledge(kb_type: str, kb_config: dict):
         try:
             return kb_module.setup_knowledge_base(kb_config)
         except Exception as e:
-            # st.error(f"KB Init Error: {e}") # Suppress error on UI if just loading
             return None
     return None
 
-def get_agent(model, instructions, kb_type, kb_config, session_id) -> Agent:
+def get_agent(model, system_prompt, kb_type, kb_config, session_id) -> Agent:
+    """
+    system_prompt expected dict keys: 
+    - description, instructions (list), additional_context, expected_output
+    """
     knowledge = get_knowledge(kb_type, kb_config)   
     if not session_id:
         new_sid = str(uuid4())
@@ -39,7 +42,11 @@ def get_agent(model, instructions, kb_type, kb_config, session_id) -> Agent:
         model=model,
         knowledge=knowledge,
         search_knowledge=True,
-        instructions=instructions.splitlines(),
+        # Map the system prompt
+        description=system_prompt.get("description"),
+        instructions=system_prompt.get("instructions"),
+        additional_context=system_prompt.get("additional_context"),
+        expected_output=system_prompt.get("expected_output"),
         session_id=session_id,
         markdown=True,
     )
