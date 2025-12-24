@@ -311,6 +311,7 @@ def render(history_db=None):
                                 knowledge.remove_content_by_id(item.id)
                         
                         st.success("Selected documents deleted successfully!")
+                        get_cached_contents.clear()
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error deleting documents: {e}")
@@ -326,6 +327,7 @@ def render(history_db=None):
                         db_logic.remove_document_from_usages(history_db, metaid)
                     knowledge.remove_content_by_id(content.id)
                 st.success("Knowledge base cleared!")
+                get_cached_contents.clear()
                 st.rerun()
         except Exception as e:
             st.error(f"Error clearing database: {e}")
