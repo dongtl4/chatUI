@@ -4,6 +4,17 @@ import src.core.knowledge as kb_logic
 import src.core.db as db_logic
 from agno.filters import AND, EQ, IN, NOT
 from uuid import uuid4
+import json
+from sqlalchemy import text
+from agno.knowledge import Knowledge
+
+@st.cache_data(ttl=60) # Cache for 60 seconds
+def get_cached_contents(_knowledge):
+    # The underscore in _knowledge tells streamlit not to hash this object
+    try:
+        return _knowledge.contents_db.get_knowledge_contents()
+    except Exception as e:
+        return [], str(e)
 
 def auto_initialize(history_db):
     """
@@ -27,6 +38,61 @@ def auto_initialize(history_db):
             st.session_state["knowledge_filters"] = None
     else:
         st.session_state["knowledge_filters"] = None
+
+def time_convert(timestamp):
+    import datetime
+    return datetime.datetime.fromtimestamp(int(timestamp), datetime.UTC)
+
+# Function to edit content of Embedded Documents
+@st.dialog("Edit Content")
+def edit_content_dialog(
+    content_id: str,
+    current_name: str,
+    current_description: str,
+    current_metadata: dict,
+    current_updated_at: str,
+    knowledge: Knowledge
+):
+    """
+    Dialog to edit content name, description, and metadata.
+    Enforces read-only meta_id and update_date.
+    """
+    # 1. Show Update Date (Read-only)
+    st.info(f"Last Updated: {time_convert(current_updated_at)} GMT")
+
+    # 2. Editable Fields: Name & Description
+    new_name = st.text_input("Name", value=current_name, help="Update the display name of this content.")
+    new_description = st.text_area("Description", value=current_description, help="Update the description.")
+
+    # 3. Metadata Handling
+    st.write("### Metadata")
+    
+    # Extract meta_id to keep it safe (read-only)
+    metaid = current_metadata.get("metaid")
+    if metaid:
+        st.info(f"Meta ID: `{metaid}`", icon="🔒")
+
+    # Filter out meta_id for the editable JSON area
+    editable_metadata = {k: v for k, v in current_metadata.items() if k != "metaid"}
+    
+    # Display JSON editor for remaining metadata
+    metadata_str = st.text_area(
+        "Edit Metadata (JSON)",
+        value=json.dumps(editable_metadata, indent=2),
+        height=200,
+        help='Modify metadata values. Must be follow strict JSON rule, for example: {"type": "pdf", "source" : "ACM paper"}'
+    )
+
+    # 4. Save Action
+    if st.button(label="Save", type="primary"):
+        new_metadata = json.loads(metadata_str)
+        new_metadata['metaid'] = metaid
+        from agno.knowledge.content import Content
+        saved_content = Content(id=content_id, name=new_name, description=new_description, metadata=new_metadata)
+        knowledge._update_content(saved_content)
+        get_cached_contents.clear()
+        st.rerun()
+    
 
 def render(history_db=None):
     st.header("📚 Knowledge File Management")
@@ -113,12 +179,8 @@ def render(history_db=None):
     st.divider()
     st.subheader("🗄️ Stored Knowledge")
     
-    # --- Fetch Content List ---
-    try:
-        contents, _ = knowledge.contents_db.get_knowledge_contents()
-    except Exception as e:
-        st.error(f"Error fetching knowledge contents: {e}")
-        contents = []
+    # --- Fetch Content List ---      
+    contents, _ = get_cached_contents(knowledge)
 
     # --- Fetch Marked Docs for Session ---
     current_session_id = st.session_state.get("session_id")
@@ -149,18 +211,25 @@ def render(history_db=None):
                 }
             </style>
             """, unsafe_allow_html=True)
+        # st.markdown("""
+        #     <style>
+        #         div[class*="st-key-knowledge_management_edit_button_"] button {
+        #             margin-top: -8px !important;
+        #         }
+        #     </style>
+        #     """, unsafe_allow_html=True)
         
         # Display list with checkboxes
         for content in contents:
-            col_mark, col_del, col_name = st.columns([1, 1, 6])
+            col_mark, col_del, col_name, col_edit = st.columns([1, 1, 6, 1])
+
+            # Key: sel_{id}_{session}
+            chk_key = f"sel_{content.id}_{current_session_id}"
             
             # --- 1. Mark Column ---
             with col_mark:
                 content_metaid = content.metadata.get("metaid") if content.metadata else None
                 is_checked = (content_metaid in marked_metaids) if content_metaid else False
-                
-                # Key: sel_{id}_{session}
-                chk_key = f"sel_{content.id}_{current_session_id}"
                 
                 with st.container(key=f"knowledge_management_checkboxes_container_{chk_key}_mark"):
                     if current_session_id and content_metaid:
@@ -178,6 +247,19 @@ def render(history_db=None):
             # --- 3. Name Column ---
             with col_name:
                 st.write(content.name)
+
+            # --- 4. Edit Column ---
+            with col_edit:
+                with st.container(key=f"knowledge_management_edit_button_{content.id}"):
+                    if st.button("Edit", key=f"edit_{content.id}"):
+                        edit_content_dialog(
+                            content_id=content.id,
+                            current_name=content.name,
+                            current_description=content.description,
+                            current_metadata=content.metadata,
+                            current_updated_at=str(content.updated_at),
+                            knowledge=knowledge,
+                        )
         
         st.write("") 
         
