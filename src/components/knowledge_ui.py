@@ -8,7 +8,7 @@ import json
 from sqlalchemy import text
 from agno.knowledge import Knowledge
 
-@st.cache_data(ttl=60) # Cache for 60 seconds
+@st.cache_data 
 def get_cached_contents(_knowledge):
     # The underscore in _knowledge tells streamlit not to hash this object
     try:
@@ -89,6 +89,7 @@ def edit_content_dialog(
         new_metadata['metaid'] = metaid
         from agno.knowledge.content import Content
         saved_content = Content(id=content_id, name=new_name, description=new_description, metadata=new_metadata)
+        # Update content in contentdb
         knowledge._update_content(saved_content)
         get_cached_contents.clear()
         st.rerun()
@@ -178,9 +179,40 @@ def render(history_db=None):
 
     st.divider()
     st.subheader("🗄️ Stored Knowledge")
+
+    # Column headers
+    mark_col, del_col, name_col, uptime_col, stat_col, edit_col = st.columns([1, 1, 4, 2, 1, 1])
+    with mark_col:
+        st.markdown("**Mark Select**")
+    with del_col:
+        st.markdown("**Del Select**")
+    with name_col:
+        st.markdown("**Name**")
+    with uptime_col:
+        st.markdown("**Update At**")
+    with stat_col:
+        st.markdown("**Status**")
+    with edit_col:
+        st.selectbox("Sort by", options= ['name asc', 'name des', 'time asc', 'time des', 'status'], key='contents_sort_key', index=3)
+
+    # Sorting function
+    def sort_contents(contents, sort_option):
+        if sort_option == "name asc":
+            return sorted(contents, key=lambda x: x.name)
+        if sort_option == "name des":
+            return sorted(contents, key=lambda x: x.name, reverse=True)
+        if sort_option == "time asc":
+            return sorted(contents, key=lambda x: x.updated_at)
+        if sort_option == "time des":
+            return sorted(contents, key=lambda x: x.updated_at, reverse=True)
+        if sort_option == "status":
+            return sorted(contents, key=lambda x: x.status)
+        return contents
+
     
     # --- Fetch Content List ---      
-    contents, _ = get_cached_contents(knowledge)
+    raw_contents, _ = get_cached_contents(knowledge)
+    contents = sort_contents(raw_contents, st.session_state.contents_sort_key)
 
     # --- Fetch Marked Docs for Session ---
     current_session_id = st.session_state.get("session_id")
@@ -195,15 +227,6 @@ def render(history_db=None):
         st.session_state["knowledge_filters"] = None
 
     if contents:
-        # Column headers
-        mark_col, del_col, name_col = st.columns([1, 1, 6])
-        with mark_col:
-            st.markdown("**Mark Sel**")
-        with del_col:
-            st.markdown("**Del Sel**")
-        with name_col:
-            st.markdown("**Document Name**")
-
         st.markdown("""
             <style>
                 div[class*="st-key-knowledge_management_checkboxes_container_"] div[data-testid="stCheckbox"] {
@@ -211,17 +234,17 @@ def render(history_db=None):
                 }
             </style>
             """, unsafe_allow_html=True)
-        # st.markdown("""
-        #     <style>
-        #         div[class*="st-key-knowledge_management_edit_button_"] button {
-        #             margin-top: -8px !important;
-        #         }
-        #     </style>
-        #     """, unsafe_allow_html=True)
+        st.markdown("""
+            <style>
+                div[class*="st-key-knowledge_management_edit_button_"] button {
+                    margin-top: -8px !important;
+                }
+            </style>
+            """, unsafe_allow_html=True)
         
         # Display list with checkboxes
         for content in contents:
-            col_mark, col_del, col_name, col_edit = st.columns([1, 1, 6, 1])
+            col_mark, col_del, col_name, col_uptime, col_stat, col_edit = st.columns([1, 1, 4, 2, 1, 1])
 
             # Key: sel_{id}_{session}
             chk_key = f"sel_{content.id}_{current_session_id}"
@@ -248,7 +271,15 @@ def render(history_db=None):
             with col_name:
                 st.write(content.name)
 
-            # --- 4. Edit Column ---
+            # --- 4. Update Time ---
+            with col_uptime:
+                st.write(f"{str(time_convert(str(content.updated_at)))[:-9]} GMT")
+
+            # --- 5. Status ---
+            with col_stat:
+                st.write(content.status)
+
+            # --- 6. Edit Column ---
             with col_edit:
                 with st.container(key=f"knowledge_management_edit_button_{content.id}"):
                     if st.button("Edit", key=f"edit_{content.id}"):
