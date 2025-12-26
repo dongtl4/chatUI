@@ -1,4 +1,5 @@
 import streamlit as st
+
 import os
 
 def get_env_defaults():
@@ -6,7 +7,7 @@ def get_env_defaults():
     return {
         "host": os.getenv("PG_HOST", "localhost"),
         "port": os.getenv("PG_PORT", "5432"),
-        "db": os.getenv("PG_DB", "ai"),
+        "db": os.getenv("PG_DB", "testing"),
         "user": os.getenv("PG_USER", "postgres"),
         "password": os.getenv("PG_PASSWORD", "123456"),
         "table_name": "vectors",

@@ -9,8 +9,7 @@ from sqlalchemy import text
 from agno.knowledge import Knowledge
 
 @st.cache_data 
-def get_cached_contents(_knowledge):
-    # The underscore in _knowledge tells streamlit not to hash this object
+def get_cached_contents(_knowledge, kb_config): 
     try:
         return _knowledge.contents_db.get_knowledge_contents()
     except Exception as e:
@@ -211,7 +210,7 @@ def render(history_db=None):
 
     
     # --- Fetch Content List ---      
-    raw_contents, _ = get_cached_contents(knowledge)
+    raw_contents, _ = get_cached_contents(knowledge, st.session_state['kb_confirmed_config'])
     contents = sort_contents(raw_contents, st.session_state.contents_sort_key)
 
     # --- Fetch Marked Docs for Session ---
