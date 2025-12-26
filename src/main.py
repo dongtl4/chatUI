@@ -9,6 +9,9 @@ from src.core import agent as agent_logic
 # Component imports
 from src.components import sidebar, chat, agent_config, knowledge_config, knowledge_ui
 
+# Help page
+from utils import help
+
 # Load environment variables
 load_dotenv()
 
@@ -68,6 +71,8 @@ def main():
         knowledge_config.render()
     elif view == "knowledge_ui":
         knowledge_ui.render(history_db)
+    elif view == "help_interface":
+        help.render()
     else:
         st.error(f"Unknown view: {view}")
 

@@ -1,6 +1,7 @@
 import streamlit as st
 from src.core import db as db_logic
 
+
 def render_sidebar(history_db):
     """
     Renders the sidebar navigation and updates the 'current_view' in session state.
@@ -11,7 +12,8 @@ def render_sidebar(history_db):
         st.session_state["current_view"] = "chat_interface"
 
     with st.sidebar:
-        st.header("NAVIGATION")
+        if st.button("Help",use_container_width=True):
+            st.session_state["current_view"] = "help_interface"
         if st.session_state.get("session_id"):
             st.caption(f"Session: {st.session_state.get('session_id')}")
         if st.session_state.get("model_params"):
