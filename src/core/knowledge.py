@@ -51,6 +51,7 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
 
     return Knowledge(
         vector_db=vector_db, 
-        contents_db=contents_db, 
+        contents_db=contents_db,
+        max_results=kb_config.get('max_results', 10),
         name=kb_config.get('knowledge_name', 'Agno Knowledge Base')
     )

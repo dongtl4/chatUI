@@ -377,12 +377,11 @@ def render(history_db=None):
                 active_filters = st.session_state["knowledge_filters"] if st.session_state.get("use_knowledge_filter") else None
                 
                 with st.spinner(f"Running test query for '{test_query}'..."):
-                    response = knowledge.vector_db.search(
+                    response = knowledge.search(
                         query=test_query,
-                        limit=5,
-                        filters=active_filters,
+                        filters=active_filters
                     )
-                    st.markdown(f"**Response for query '{test_query}':**")
+                    st.markdown(f"**Found {len(response)} responses for query '{test_query}':**")
                     for res in response:
                         st.write(f"- Name: {res.name}")
                         st.write(f"  - Content (truncated): {res.content[:500]}...")

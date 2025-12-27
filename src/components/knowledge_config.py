@@ -11,6 +11,7 @@ def get_env_defaults():
         "user": os.getenv("PG_USER", "postgres"),
         "password": os.getenv("PG_PASSWORD", "123456"),
         "table_name": "vectors",
+        "max_results": 10,
         "knowledge_name": "Default Knowledge Base"
     }
 
@@ -52,12 +53,14 @@ def render():
             kb_table = st.text_input("Table Name", value=current_config.get("table_name"))
         
         kb_name = st.text_input("Knowledge name", value=current_config.get("knowledge_name"))
+        kb_max_results = st.number_input("Max Results", value=current_config.get("max_results"))
 
         if st.button("Save & Reconnect", type="primary"):
             st.session_state['kb_confirmed_config'] = {
                 "host": kb_host, "port": kb_port, "db": kb_db, 
                 "user": kb_user, "password": kb_password, 
-                "table_name": kb_table, "knowledge_name": kb_name
+                "table_name": kb_table, "max_results": kb_max_results,
+                "knowledge_name": kb_name
             }
             st.session_state['kb_active_type'] = selected_kb_type
             st.success("Configuration updated!")
