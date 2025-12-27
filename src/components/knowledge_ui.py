@@ -126,6 +126,7 @@ def render(history_db=None):
                         try:
                             for url in urls:
                                 knowledge.add_web_page(url)
+                            get_cached_contents.clear()
                             st.success(f"Added {len(urls)} URLs successfully!")
                         except Exception as e:
                             st.error(f"Error adding URLs: {e}")
@@ -165,6 +166,7 @@ def render(history_db=None):
                     try:
                         if contents_to_add:
                             knowledge.add_contents(contents_to_add)
+                            get_cached_contents.clear()
                             st.success(f"✅ Added {len(contents_to_add)} file(s)")
                         
                         for path in temp_paths:
