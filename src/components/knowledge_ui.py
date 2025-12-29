@@ -166,7 +166,6 @@ def render(history_db=None):
                     try:
                         if contents_to_add:
                             knowledge.add_contents(contents_to_add)
-                            get_cached_contents.clear()
                             st.success(f"✅ Added {len(contents_to_add)} file(s)")
                         
                         for path in temp_paths:
@@ -176,6 +175,7 @@ def render(history_db=None):
                         st.error(f"Error adding files: {e}")
                     
                     st.session_state["file_uploader_key"] += 1
+                    get_cached_contents.clear()
                     st.rerun()
 
     st.divider()
