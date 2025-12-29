@@ -32,7 +32,7 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
     db_url = f"postgresql+psycopg://{kb_config['user']}:{kb_config['password']}@{kb_config['host']}:{kb_config['port']}/{kb_config['db']}"
 
     embedder = OllamaEmbedder(
-        id="nomic-embed-text", 
+        id="embeddinggemma:latest", 
         dimensions=768, 
         host="http://10.10.128.140:11434"
     )

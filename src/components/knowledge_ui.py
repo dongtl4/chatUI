@@ -119,17 +119,24 @@ def render(history_db=None):
         st.subheader("🌐 Add URLs")
         urls_input = st.text_area("Enter URLs (one per line)", height=100)
         if st.button("Add URLs"):
+            url_contents = []
             if urls_input:
                 urls = [url.strip() for url in urls_input.split('\n') if url.strip()]
                 if urls:
                     with st.spinner("Processing URLs..."):
                         try:
                             for url in urls:
-                                knowledge.add_web_page(url)
-                            get_cached_contents.clear()
+                                metaid = str(uuid4())
+                                url_contents.append({
+                                    "url": url,
+                                    "name": url,
+                                    "metadata": {"metaid": metaid},
+                                })
+                            knowledge.add_contents(url_contents)
                             st.success(f"Added {len(urls)} URLs successfully!")
                         except Exception as e:
                             st.error(f"Error adding URLs: {e}")
+                    get_cached_contents.clear()
             else:
                 st.warning("Please enter at least one URL.")
 
