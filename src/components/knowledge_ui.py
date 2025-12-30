@@ -188,21 +188,6 @@ def render(history_db=None):
     st.divider()
     st.subheader("🗄️ Stored Knowledge")
 
-    # Column headers
-    mark_col, del_col, name_col, uptime_col, stat_col, edit_col = st.columns([1, 1, 4, 2, 1, 1])
-    with mark_col:
-        st.markdown("**Mark Select**")
-    with del_col:
-        st.markdown("**Del Select**")
-    with name_col:
-        st.markdown("**Name**")
-    with uptime_col:
-        st.markdown("**Update At**")
-    with stat_col:
-        st.markdown("**Status**")
-    with edit_col:
-        st.selectbox("Sort by", options= ['name asc', 'name des', 'time asc', 'time des', 'status'], key='contents_sort_key', index=3)
-
     # Sorting function
     def sort_contents(contents, sort_option):
         if sort_option == "name asc":
@@ -218,7 +203,9 @@ def render(history_db=None):
         return contents
 
     
-    # --- Fetch Content List ---      
+    # --- Fetch Content List ---   
+    if "contents_sort_key" not in st.session_state:
+        st.session_state["contents_sort_key"] = "time des"   
     raw_contents, _ = get_cached_contents(knowledge, st.session_state['kb_confirmed_config'])
     contents = sort_contents(raw_contents, st.session_state.contents_sort_key)
 
@@ -233,6 +220,22 @@ def render(history_db=None):
         st.session_state["knowledge_filters"] = [IN("metaid", marked_metaids)]
     else:
         st.session_state["knowledge_filters"] = None
+
+    # --- CALLBACKS FOR SELECT ALL ---
+    def toggle_mark_all():
+        """Toggles the 'Mark' checkbox for all eligible files."""
+        new_state = st.session_state.get("mark_all_master", False)
+        for c in contents:
+            if current_session_id and c.metadata.get("metaid"):
+                k = f"sel_{c.id}_{current_session_id}"
+                st.session_state[k] = new_state
+
+    def toggle_del_all():
+        """Toggles the 'Del' checkbox for all files."""
+        new_state = st.session_state.get("del_all_master", False)
+        for c in contents:
+            k = f"del_sel_{c.id}_{current_session_id}"
+            st.session_state[k] = new_state
 
     if contents:
         st.markdown("""
@@ -249,6 +252,31 @@ def render(history_db=None):
                 }
             </style>
             """, unsafe_allow_html=True)
+        
+        st.markdown("""
+            <style>
+                div[class*="st-key-knowledge_management_checkboxes_container_"] div[data-testid="stCheckbox"] {
+                    margin-top: 0px !important;
+                }
+            </style>
+            """, unsafe_allow_html=True)
+        
+        # --- Column Headers ---
+        mark_col, del_col, name_col, uptime_col, stat_col, edit_col = st.columns([1, 1, 4, 2, 1, 1])
+        with mark_col:
+            with st.container(key="knowledge_management_checkboxes_container_master_mark"):
+                st.checkbox("**Mark All**", key="mark_all_master", on_change=toggle_mark_all)
+        with del_col:
+            with st.container(key="knowledge_management_checkboxes_container_master_del"):
+                st.checkbox("**Del All**", key="del_all_master", on_change=toggle_del_all)
+        with name_col:
+            st.markdown("**Name**")
+        with uptime_col:
+            st.markdown("**Update At**")
+        with stat_col:
+            st.markdown("**Status**")
+        with edit_col:
+             st.selectbox("Sort by", options=['name asc', 'name des', 'time asc', 'time des', 'status'], key='contents_sort_key', index=3, label_visibility="collapsed")
         
         # Display list with checkboxes
         for content in contents:
