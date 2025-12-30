@@ -91,6 +91,7 @@ def edit_content_dialog(
         # Update content in contentdb
         knowledge._update_content(saved_content)
         get_cached_contents.clear()
+        kb_logic.setup_knowledge_base.clear()
         st.rerun()
     
 
@@ -137,6 +138,7 @@ def render(history_db=None):
                         except Exception as e:
                             st.error(f"Error adding URLs: {e}")
                     get_cached_contents.clear()
+                    kb_logic.setup_knowledge_base.clear()
             else:
                 st.warning("Please enter at least one URL.")
 
@@ -183,6 +185,7 @@ def render(history_db=None):
                     
                     st.session_state["file_uploader_key"] += 1
                     get_cached_contents.clear()
+                    kb_logic.setup_knowledge_base.clear()
                     st.rerun()
 
     st.divider()
@@ -276,7 +279,7 @@ def render(history_db=None):
         with stat_col:
             st.markdown("**Status**")
         with edit_col:
-             st.selectbox("Sort by", options=['name asc', 'name des', 'time asc', 'time des', 'status'], key='contents_sort_key', index=3, label_visibility="collapsed")
+             st.selectbox("Sort by", options=['name asc', 'name des', 'time asc', 'time des', 'status'], key='contents_sort_key', label_visibility="collapsed")
         
         # Display list with checkboxes
         for content in contents:
@@ -379,6 +382,7 @@ def render(history_db=None):
                         
                         st.success("Selected documents deleted successfully!")
                         get_cached_contents.clear()
+                        kb_logic.setup_knowledge_base.clear()
                         st.rerun()
                     except Exception as e:
                         st.error(f"Error deleting documents: {e}")
@@ -395,6 +399,7 @@ def render(history_db=None):
                     knowledge.remove_content_by_id(content.id)
                 st.success("Knowledge base cleared!")
                 get_cached_contents.clear()
+                kb_logic.setup_knowledge_base.clear()
                 st.rerun()
         except Exception as e:
             st.error(f"Error clearing database: {e}")
