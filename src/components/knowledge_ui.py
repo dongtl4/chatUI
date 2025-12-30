@@ -15,6 +15,71 @@ def get_cached_contents(_knowledge, kb_config):
         return _knowledge.contents_db.get_knowledge_contents()
     except Exception as e:
         return [], str(e)
+    
+# Functions to filter contents based on metadata, name or status    
+def filter_contents_by_metadata(contents, key, value, relation):
+    if not key or not value:
+        return contents
+
+    filtered = []
+    for c in contents:
+        meta_value = c.metadata.get(key)
+        if meta_value is None:
+            continue
+        if relation == 'in':
+            if str(value) in str(meta_value):
+                filtered.append(c)
+        elif relation == 'not in':
+            if str(value) not in str(meta_value):
+                filtered.append(c)
+    return filtered
+
+def filter_contents_by_name(contents, search_str, relation):
+    if not search_str:
+        return contents
+
+    filtered = []
+    for c in contents:
+        name = c.name
+        if relation == 'in':
+            if search_str.lower() in name.lower():
+                filtered.append(c)
+        elif relation == 'not in':
+            if search_str.lower() not in name.lower():
+                filtered.append(c)
+    return filtered
+
+def filter_contents_by_status(contents, status_str, relation):
+    if not status_str:
+        return contents
+
+    filtered = []
+    for c in contents:
+        status = c.status
+        if relation == 'is':
+            if status_str.lower() == status.lower():
+                filtered.append(c)
+        elif relation == 'is not':
+            if status_str.lower() != status.lower():
+                filtered.append(c)
+    return filtered
+
+def filter_contents(contents, type, **kwargs):
+    if type == "metadata":
+        key = kwargs.get("key")
+        value = kwargs.get("value")
+        relation = kwargs.get("relation", "in")
+        return filter_contents_by_metadata(contents, key, value, relation)
+    elif type == "name":
+        search_str = kwargs.get("search_str")
+        relation = kwargs.get("relation", "in")
+        return filter_contents_by_name(contents, search_str, relation)
+    elif type == "status":
+        status_str = kwargs.get("status_str")
+        relation = kwargs.get("relation", "is")
+        return filter_contents_by_status(contents, status_str, relation)
+    else:
+        return contents
 
 def auto_initialize(history_db):
     """
@@ -193,7 +258,7 @@ def render(history_db=None):
     st.subheader("🗄️ Stored Knowledge")
 
     # --- Fetch Content List ---      
-    contents, _ = get_cached_contents(knowledge, st.session_state['kb_confirmed_config'])
+    raw_contents, _ = get_cached_contents(knowledge, st.session_state['kb_confirmed_config'])
 
     # --- Fetch Marked Docs for Session ---
     current_session_id = st.session_state.get("session_id")
@@ -201,13 +266,22 @@ def render(history_db=None):
     if current_session_id:
         marked_metaids = db_logic.get_session_documents(history_db, current_session_id)
 
+    # --- Initial Fitler Setup ---
+    if "filtered_ids" not in st.session_state:
+        st.session_state.filtered_ids = None
+    if st.session_state.filtered_ids is None:
+        contents = raw_contents
+    else:
+        valid_ids = set(st.session_state.filtered_ids)
+        contents = [c for c in raw_contents if c.id in valid_ids]
+
     # --- Update Knowledge Filters based on Marked Docs ---
     if marked_metaids:
         st.session_state["knowledge_filters"] = [IN("metaid", marked_metaids)]
     else:
         st.session_state["knowledge_filters"] = None
 
-    # Mapping
+    # --- Mapping ---
     content_map = {c.id: c for c in contents}
 
     # select/unselect all functionality
@@ -226,7 +300,7 @@ def render(history_db=None):
             st.session_state.delete_all_state = delete
         st.session_state.kb_table_version += 1
     # We use small columns to place these buttons neatly above the table
-    c_all_1, c_all_2, c_all_3, c_all_4, c_key, c_rela, c_value, c_search = st.columns([0.4, 1.1, 0.4, 1.1, 2, 1, 2.5, 0.5])
+    c_all_1, c_all_2, c_all_3, c_all_4, c_type, c_key, c_rela, c_value, c_search = st.columns([0.4, 1.1, 0.4, 1.1, 1, 1, 1, 2.5, 0.5])
     
     with c_all_1:
         st.button("☑️", on_click=set_table_state, kwargs={"mark": True}, help="Select all for RAG", width='content')
@@ -236,6 +310,60 @@ def render(history_db=None):
         st.button("☑️", on_click=set_table_state, kwargs={"delete": True}, help="Select all for Deletion", width='content')
     with c_all_4:
         st.button("⬜", on_click=set_table_state, kwargs={"delete": False}, help="Clear Delete selections", width='content')
+
+    # --- Filters ---
+    with c_type:
+        filter_type = st.selectbox("Filter type", options = ["RESET", "name", "status", "metadata"], label_visibility='collapsed')
+
+    # Render specific inputs based on type
+    if filter_type == "RESET":
+        if st.session_state.filtered_ids is not None:
+            st.session_state.filtered_ids = None
+            st.rerun()
+    # SEARCH: Only show if a type is selected
+    else:
+        # Initialize inputs
+        filter_key = None
+        filter_value = None
+        filter_relation = "in"
+
+        if filter_type == 'metadata':
+            with c_key:
+                filter_key = st.text_input("meta key", placeholder="Key", label_visibility='collapsed')
+        
+        with c_rela:
+            if filter_type == "status":
+                rel_option = st.selectbox("Relation", options=["IS", "IS NOT"], label_visibility='collapsed')
+            else:
+                rel_option = st.selectbox("Relation", options=["IN", "NOT IN"], label_visibility='collapsed')
+            filter_relation = rel_option.lower()
+
+        with c_value:
+            # key=... ensures the box clears when you switch filter types
+            filter_value = st.text_input(
+                "value", 
+                placeholder="Search...", 
+                label_visibility='collapsed',
+                key=f"search_val_{filter_type}" 
+            )
+        
+        with c_search:
+            # The Search Button
+            if st.button("🔍"):
+                # DRILL DOWN: Filter the CURRENTLY displayed_contents
+                new_subset = filter_contents(
+                    contents, 
+                    filter_type, 
+                    key=filter_key, 
+                    value=filter_value, 
+                    search_str=filter_value, 
+                    status_str=filter_value,
+                    relation=filter_relation
+                )
+                
+                # Update the ID list with the new narrower results
+                st.session_state.filtered_ids = [c.id for c in new_subset]
+                st.rerun()
 
     # Build the DataFrame rows
     table_data = []
@@ -348,8 +476,6 @@ def render(history_db=None):
                         knowledge=knowledge,
                     )
     
-
-
 
     st.divider()
     st.subheader("Quick Test Query 🔍")
