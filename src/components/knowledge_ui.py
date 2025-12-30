@@ -5,6 +5,7 @@ import src.core.db as db_logic
 from agno.filters import AND, EQ, IN, NOT
 from uuid import uuid4
 import json
+import pandas as pd
 from sqlalchemy import text
 from agno.knowledge import Knowledge
 
@@ -224,185 +225,112 @@ def render(history_db=None):
     else:
         st.session_state["knowledge_filters"] = None
 
-    # --- CALLBACKS FOR SELECT ALL ---
-    def toggle_mark_all():
-        """Toggles the 'Mark' checkbox for all eligible files."""
-        new_state = st.session_state.get("mark_all_master", False)
-        for c in contents:
-            if current_session_id and c.metadata.get("metaid"):
-                k = f"sel_{c.id}_{current_session_id}"
-                st.session_state[k] = new_state
+    # Mapping
+    content_map = {c.id: c for c in contents}
 
-    def toggle_del_all():
-        """Toggles the 'Del' checkbox for all files."""
-        new_state = st.session_state.get("del_all_master", False)
-        for c in contents:
-            k = f"del_sel_{c.id}_{current_session_id}"
-            st.session_state[k] = new_state
+    # Build the DataFrame rows
+    table_data = []
+    for c in contents:
+        # Determine if marked
+        c_metaid = c.metadata.get("metaid")
+        is_marked = (c_metaid in marked_metaids) if c_metaid else False
+        
+        table_data.append({
+            "Mark": is_marked,
+            "Delete": False,  # Default to unchecked
+            "Name": c.name,
+            "Updated At": str(time_convert(str(c.updated_at)))[:-9] + " GMT",
+            "Status": c.status,
+            "Edit": False,    # Default to unchecked
+            "ID": c.id,          # Hidden ID column
+            "MetaID": c_metaid,  # Hidden MetaID column
+        })
 
-    if contents:
-        st.markdown("""
-            <style>
-                div[class*="st-key-knowledge_management_checkboxes_container_"] div[data-testid="stCheckbox"] {
-                    margin-top: 0px !important;
-                }
-            </style>
-            """, unsafe_allow_html=True)
-        st.markdown("""
-            <style>
-                div[class*="st-key-knowledge_management_edit_button_"] button {
-                    margin-top: -8px !important;
-                }
-            </style>
-            """, unsafe_allow_html=True)
-        
-        st.markdown("""
-            <style>
-                div[class*="st-key-knowledge_management_checkboxes_container_"] div[data-testid="stCheckbox"] {
-                    margin-top: 0px !important;
-                }
-            </style>
-            """, unsafe_allow_html=True)
-        
-        # --- Column Headers ---
-        mark_col, del_col, name_col, uptime_col, stat_col, edit_col = st.columns([1, 1, 4, 2, 1, 1])
-        with mark_col:
-            with st.container(key="knowledge_management_checkboxes_container_master_mark"):
-                st.checkbox("**Mark All**", key="mark_all_master", on_change=toggle_mark_all)
-        with del_col:
-            with st.container(key="knowledge_management_checkboxes_container_master_del"):
-                st.checkbox("**Del All**", key="del_all_master", on_change=toggle_del_all)
-        with name_col:
-            st.markdown("**Name**")
-        with uptime_col:
-            st.markdown("**Update At**")
-        with stat_col:
-            st.markdown("**Status**")
-        with edit_col:
-             st.selectbox("Sort by", options=['name asc', 'name des', 'time asc', 'time des', 'status'], key='contents_sort_key', label_visibility="collapsed")
-        
-        # Display list with checkboxes
-        for content in contents:
-            col_mark, col_del, col_name, col_uptime, col_stat, col_edit = st.columns([1, 1, 4, 2, 1, 1])
+    df = pd.DataFrame(table_data)
 
-            # Key: sel_{id}_{session}
-            chk_key = f"sel_{content.id}_{current_session_id}"
-            
-            # --- 1. Mark Column ---
-            with col_mark:
-                content_metaid = content.metadata.get("metaid") if content.metadata else None
-                is_checked = (content_metaid in marked_metaids) if content_metaid else False
+    # --- 2. Render Table ---
+    editor_key = f"kb_table_{current_session_id}_{st.session_state.get('file_uploader_key', 0)}"
+    
+    edited_df = st.data_editor(
+        df,
+        key=editor_key,
+        hide_index=True,
+        width='stretch',
+        column_config={
+            "Mark": st.column_config.CheckboxColumn("Mark (RAG)", default=False),
+            "Delete": st.column_config.CheckboxColumn("Delete", default=False),
+            "Name": st.column_config.TextColumn("Name", disabled=True),
+            "Updated At": st.column_config.TextColumn("Updated At", disabled=True),
+            "Status": st.column_config.TextColumn("Status", disabled=True),
+            "Edit": st.column_config.CheckboxColumn("Edit", default=False),
+            "ID": None,     # Hidden
+            "MetaID": None, # Hidden
+        }
+    )
+
+    # --- 3. Action Buttons ---
+    st.write("")
+    c_mark, c_del, c_edit = st.columns([1, 1, 1])
+
+    # [ACTION 1] Mark Selected
+    with c_mark:
+        if st.button("📌 Mark Selected for RAG", use_container_width=True):
+            if not current_session_id:
+                st.error("No active session.")
+            else:
+                selected_metaids = edited_df[edited_df["Mark"] == True]["MetaID"].tolist()
+                selected_metaids = [m for m in selected_metaids if m]
                 
-                with st.container(key=f"knowledge_management_checkboxes_container_{chk_key}_mark"):
-                    if current_session_id and content_metaid:
-                        st.checkbox("select box", value=is_checked, key=chk_key, label_visibility="collapsed")
-                    else:
-                        st.checkbox("select box", value=False, key=chk_key, label_visibility="collapsed", disabled=True)
-            
-            # --- 2. Delete Column ---
-            with col_del:
-                # Key: del_sel_{id}_{session} 
-                del_key = f"del_{chk_key}"
-                with st.container(key=f"knowledge_management_checkboxes_container_{chk_key}_del"):
-                    st.checkbox("select box", value=False, key=del_key, label_visibility="collapsed")
-            
-            # --- 3. Name Column ---
-            with col_name:
-                st.write(content.name)
+                db_logic.save_session_documents(history_db, current_session_id, selected_metaids)
+                st.success(f"Marked {len(selected_metaids)} documents!")
+                st.rerun()
 
-            # --- 4. Update Time ---
-            with col_uptime:
-                st.write(f"{str(time_convert(str(content.updated_at)))[:-9]} GMT")
-
-            # --- 5. Status ---
-            with col_stat:
-                st.write(content.status)
-
-            # --- 6. Edit Column ---
-            with col_edit:
-                with st.container(key=f"knowledge_management_edit_button_{content.id}"):
-                    if st.button("Edit", key=f"edit_{content.id}"):
-                        edit_content_dialog(
-                            content_id=content.id,
-                            current_name=content.name,
-                            current_description=content.description,
-                            current_metadata=content.metadata,
-                            current_updated_at=str(content.updated_at),
-                            knowledge=knowledge,
-                        )
-        
-        st.write("") 
-        
-        c_mark, c_del = st.columns(2)
-
-        # --- Button 1: Mark Selected Documents ---
-        with c_mark:
-            if st.button("📌 Mark Selected Documents for Custom RAG"):
-                if not current_session_id:
-                    st.error("No active session found.")
-                else:
-                    selected_metaids = []
-                    for content in contents:
-                        chk_key = f"sel_{content.id}_{current_session_id}"
-                        # Check the Mark checkbox state
-                        if st.session_state.get(chk_key):
-                            metaid = content.metadata.get("metaid")
-                            if metaid:
-                                selected_metaids.append(metaid)
-                    
-                    db_logic.save_session_documents(history_db, current_session_id, selected_metaids)
-                    st.success(f"Marked {len(selected_metaids)} documents for session '{current_session_id}'!")
-                    st.rerun()
-
-        # --- Button 2: Delete Selected Documents ---
-        with c_del:
-            if st.button("🗑️ Delete Selected from KB"):
-                selected_items_to_del = []
-                for content in contents:
-                    chk_key = f"sel_{content.id}_{current_session_id}"
-                    del_key = f"del_{chk_key}"
-                    
-                    # Check the DELETE checkbox state
-                    if st.session_state.get(del_key):
-                        selected_items_to_del.append(content)
-                
-                if not selected_items_to_del:
-                    st.warning("Please select at least one document to delete.")
-                else:
-                    try:
-                        with st.spinner(f"Deleting {len(selected_items_to_del)} documents..."):
-                            for item in selected_items_to_del:
-                                metaid = item.metadata.get("metaid")
-                                # 1. Remove from usages DB (This effectively "unpresses" the mark button)
-                                if metaid:
-                                    db_logic.remove_document_from_usages(history_db, metaid)
-                                
-                                # 2. Remove from actual Knowledge Base
-                                knowledge.remove_content_by_id(item.id)
-                        
-                        st.success("Selected documents deleted successfully!")
-                        get_cached_contents.clear()
-                        kb_logic.setup_knowledge_base.clear()
-                        st.rerun()
-                    except Exception as e:
-                        st.error(f"Error deleting documents: {e}")
-
-    # --- Clear Database Utility ---
-    if st.button("⚠️ Clear Entire Database"):
-        try:
-            with st.spinner("Clearing database..."):
-                contents_to_clear, _ = knowledge.contents_db.get_knowledge_contents()
-                for content in contents_to_clear:
-                    metaid = content.metadata.get("metaid")
-                    if metaid:
-                        db_logic.remove_document_from_usages(history_db, metaid)
-                    knowledge.remove_content_by_id(content.id)
-                st.success("Knowledge base cleared!")
+    # [ACTION 2] Delete Selected
+    with c_del:
+        if st.button("🗑️ Delete Selected", use_container_width=True):
+            to_delete_rows = edited_df[edited_df["Delete"] == True]
+            if to_delete_rows.empty:
+                st.warning("Select items in the 'Delete' column first.")
+            else:
+                try:
+                    with st.spinner(f"Deleting {len(to_delete_rows)} documents..."):
+                        for _, row in to_delete_rows.iterrows():
+                            # Use ID from the table
+                            knowledge.remove_content_by_id(row["ID"])
+                            if row["MetaID"]:
+                                db_logic.remove_document_from_usages(history_db, row["MetaID"])
+                    st.success("Deleted successfully!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
                 get_cached_contents.clear()
                 kb_logic.setup_knowledge_base.clear()
                 st.rerun()
-        except Exception as e:
-            st.error(f"Error clearing database: {e}")
+
+    # [ACTION 3] Edit Selected
+    with c_edit:
+        if st.button("✏️ Edit Selected", use_container_width=True):
+            # Check marked OR delete columns for selection
+            selected_rows = edited_df[(edited_df["Edit"] == True)]
+            
+            if len(selected_rows) != 1:
+                st.warning("Please select exactly one file (via Mark or Delete checkbox) to edit.")
+            else:
+                # [FIX] Lookup the original object using the ID
+                row_id = selected_rows.iloc[0]["ID"]
+                original_content = content_map.get(row_id) # <--- Retrieving from Map
+                
+                if original_content:
+                    edit_content_dialog(
+                        content_id=original_content.id,
+                        current_name=original_content.name,
+                        current_description=original_content.description,
+                        current_metadata=original_content.metadata,
+                        current_updated_at=str(original_content.updated_at),
+                        knowledge=knowledge,
+                    )
+    
+
+
 
     st.divider()
     st.subheader("Quick Test Query 🔍")

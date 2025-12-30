@@ -31,7 +31,6 @@ def ensure_database_exists(kb_config: dict):
 
 @st.cache_resource
 def setup_knowledge_base(kb_config: dict) -> Knowledge:
-    start = time.time()
     ensure_database_exists(kb_config)
     db_url = f"postgresql+psycopg://{kb_config['user']}:{kb_config['password']}@{kb_config['host']}:{kb_config['port']}/{kb_config['db']}"
 
@@ -59,8 +58,5 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
         max_results=kb_config.get('max_results', 10),
         name=kb_config.get('knowledge_name', 'Agno Knowledge Base')
     )
-
-    end = time.time()
-    print(f"Knowledge base setup took {end - start} seconds.")
 
     return knowledge
