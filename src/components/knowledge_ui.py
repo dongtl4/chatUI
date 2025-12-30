@@ -192,26 +192,8 @@ def render(history_db=None):
     st.divider()
     st.subheader("🗄️ Stored Knowledge")
 
-    # Sorting function
-    def sort_contents(contents, sort_option):
-        if sort_option == "name asc":
-            return sorted(contents, key=lambda x: x.name)
-        if sort_option == "name des":
-            return sorted(contents, key=lambda x: x.name, reverse=True)
-        if sort_option == "time asc":
-            return sorted(contents, key=lambda x: x.updated_at)
-        if sort_option == "time des":
-            return sorted(contents, key=lambda x: x.updated_at, reverse=True)
-        if sort_option == "status":
-            return sorted(contents, key=lambda x: x.status)
-        return contents
-
-    
-    # --- Fetch Content List ---   
-    if "contents_sort_key" not in st.session_state:
-        st.session_state["contents_sort_key"] = "time des"   
-    raw_contents, _ = get_cached_contents(knowledge, st.session_state['kb_confirmed_config'])
-    contents = sort_contents(raw_contents, st.session_state.contents_sort_key)
+    # --- Fetch Content List ---      
+    contents, _ = get_cached_contents(knowledge, st.session_state['kb_confirmed_config'])
 
     # --- Fetch Marked Docs for Session ---
     current_session_id = st.session_state.get("session_id")
@@ -228,16 +210,53 @@ def render(history_db=None):
     # Mapping
     content_map = {c.id: c for c in contents}
 
+    # select/unselect all functionality
+    if "kb_table_version" not in st.session_state:
+        st.session_state.kb_table_version = 0
+    if "mark_all_state" not in st.session_state:
+        st.session_state.mark_all_state = None  # None = use DB, True = all yes, False = all no
+    if "delete_all_state" not in st.session_state:
+        st.session_state.delete_all_state = None
+
+    def set_table_state(mark=None, delete=None):
+        """Updates the default state for columns and forces table refresh"""
+        if mark is not None:
+            st.session_state.mark_all_state = mark
+        if delete is not None:
+            st.session_state.delete_all_state = delete
+        st.session_state.kb_table_version += 1
+    # We use small columns to place these buttons neatly above the table
+    c_all_1, c_all_2, c_all_3, c_all_4, c_key, c_rela, c_value, c_search = st.columns([0.4, 1.1, 0.4, 1.1, 2, 1, 2.5, 0.5])
+    
+    with c_all_1:
+        st.button("☑️", on_click=set_table_state, kwargs={"mark": True}, help="Select all for RAG", width='content')
+    with c_all_2:
+        st.button("⬜", on_click=set_table_state, kwargs={"mark": False}, help="Clear RAG selections", width='content')
+    with c_all_3:
+        st.button("☑️", on_click=set_table_state, kwargs={"delete": True}, help="Select all for Deletion", width='content')
+    with c_all_4:
+        st.button("⬜", on_click=set_table_state, kwargs={"delete": False}, help="Clear Delete selections", width='content')
+
     # Build the DataFrame rows
     table_data = []
     for c in contents:
         # Determine if marked
         c_metaid = c.metadata.get("metaid")
-        is_marked = (c_metaid in marked_metaids) if c_metaid else False
+        
+        # Logic: Priority to Button State > DB State
+        if st.session_state.mark_all_state is not None:
+            is_marked = st.session_state.mark_all_state
+        else:
+            is_marked = (c_metaid in marked_metaids) if c_metaid else False
+
+        if st.session_state.delete_all_state is not None:
+            is_deleted = st.session_state.delete_all_state
+        else:
+            is_deleted = False
         
         table_data.append({
             "Mark": is_marked,
-            "Delete": False,  # Default to unchecked
+            "Delete": is_deleted,  # Default to unchecked
             "Name": c.name,
             "Updated At": str(time_convert(str(c.updated_at)))[:-9] + " GMT",
             "Status": c.status,
