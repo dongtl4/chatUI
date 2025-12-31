@@ -10,3 +10,4 @@ tmp/*
 *.cfg
 *.log
 test*.py
+*.json

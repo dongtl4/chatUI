@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
 from uuid import uuid4
+import json
 import src.core.db as db_logic
 from agno.agent import Agent
 
@@ -56,7 +57,16 @@ def render_history_ui():
         with st.chat_message("user"):
             st.markdown(entry.get("user", "") or "_(no user message)_")
         with st.chat_message("assistant"):
-            st.markdown(entry.get("assistant", "") or "_(no assistant message)_")
+            event_string = entry.get("assistant")
+            events = []
+            for event in event_string.splitlines():
+                if event.strip():
+                    events.append(json.loads(event))
+            history_lines = ""
+            for event in events:
+                if event.get("event", "") == "RunContent":
+                    history_lines += event.get("content", "")
+            st.markdown(history_lines or "_(no assistant message)_")
 
 def render(agent: Agent, history_db):
     """Main rendering entry point for chat."""
@@ -121,28 +131,31 @@ def render(agent: Agent, history_db):
 
             # Stream
             full_response = ""
+            content_response = ""
             try:
                 if not agent:
                     full_response = "⚠️ Agent not initialized. Please configure the model in the 'Agent' > 'Agent Configuration' section."
                     st.session_state["current_chat"][-1]["assistant"] = full_response
                     render_current_chat_container(current_chat_placeholder)
                 else:
-                    for chunk in agent.run(final_prompt, stream=True, knowledge_filters=st.session_state.get("knowledge_filters", None)):
+                    stream = agent.run(final_prompt, stream=True, knowledge_filters=st.session_state.get("knowledge_filters", None))
+                    for chunk in stream:
                         if hasattr(chunk, 'event') and chunk.event == "RunContent":
+                            str_chunk = json.dumps(chunk.to_dict())
+                            full_response += str_chunk + "\n"
                             if hasattr(chunk, 'content') and chunk.content:
-                                full_response += chunk.content
-                                st.session_state["current_chat"][-1]["assistant"] = full_response
+                                content_response += chunk.content
+                                st.session_state["current_chat"][-1]["assistant"] = content_response
                                 render_current_chat_container(current_chat_placeholder)
             except Exception as e:
                  full_response += f"\n\nError: {str(e)}"
-                 st.session_state["current_chat"][-1]["assistant"] = full_response
+                 st.session_state["current_chat"][-1]["assistant"] = content_response
                  render_current_chat_container(current_chat_placeholder)
             finally:
                 st.session_state.running = None
                 db_logic.save_exchange_to_db(
                     history_db, st.session_state["session_id"], original_query, full_response
                 )
-                st.session_state["history"][-1]["assistant"] = full_response
                 st.session_state.history = db_logic.load_history_from_db(
                     history_db, st.session_state.get("session_id")
                 )
