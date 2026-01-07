@@ -191,7 +191,7 @@ def render_message_events(event_string: str, show_run_metrics: bool = False):
     if show_run_metrics:
         metrics = extract_run_metrics(event_string)
         if metrics:
-            with st.popover("📊 Metrics"):
+            with st.popover("📊"):
                 st.json(metrics)
 
 def render_current_chat_container(placeholder):
@@ -294,7 +294,7 @@ def render(agent: Agent, history_db):
                     render_current_chat_container(current_chat_placeholder)
                 else:
                     stream = agent.run(
-                            original_query, 
+                            original_query,
                             stream=True, 
                             stream_events=True, 
                             dependencies = {'Previous chats which are marked as important':marked_context_str, 'Current chats':history_context_str},

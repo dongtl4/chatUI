@@ -319,6 +319,10 @@ def render(history_db=None):
     if filter_type == "RESET":
         if st.session_state.filtered_ids is not None:
             st.session_state.filtered_ids = None
+            # Reset selection states when filter changes to prevent accidental mass selection
+            st.session_state.mark_all_state = None
+            st.session_state.delete_all_state = None
+            st.session_state.kb_table_version += 1
             st.rerun()
     # SEARCH: Only show if a type is selected
     else:
@@ -363,6 +367,10 @@ def render(history_db=None):
                 
                 # Update the ID list with the new narrower results
                 st.session_state.filtered_ids = [c.id for c in new_subset]
+                # Reset selection states when filter changes
+                st.session_state.mark_all_state = None
+                st.session_state.delete_all_state = None
+                st.session_state.kb_table_version += 1
                 st.rerun()
 
     # Build the DataFrame rows
@@ -396,7 +404,8 @@ def render(history_db=None):
     df = pd.DataFrame(table_data)
 
     # --- 2. Render Table ---
-    editor_key = f"kb_table_{current_session_id}_{st.session_state.get('file_uploader_key', 0)}"
+    # Add version to key to force editor refresh when clearing/selecting all
+    editor_key = f"kb_table_{current_session_id}_{st.session_state.get('file_uploader_key', 0)}_{st.session_state.kb_table_version}"
     
     edited_df = st.data_editor(
         df,
@@ -424,12 +433,29 @@ def render(history_db=None):
         if st.button("📌 Mark Selected for RAG", use_container_width=True):
             if not current_session_id:
                 st.error("No active session.")
-            else:
-                selected_metaids = edited_df[edited_df["Mark"] == True]["MetaID"].tolist()
-                selected_metaids = [m for m in selected_metaids if m]
+            else:               
+                # 1. Identify what is currently visible/editable in the table
+                visible_metaids = set(edited_df["MetaID"].dropna().tolist())
                 
-                db_logic.save_session_documents(history_db, current_session_id, selected_metaids)
-                st.success(f"Marked {len(selected_metaids)} documents!")
+                # 2. Identify what is selected in the UI (edited_df)
+                selected_rows = edited_df[edited_df["Mark"] == True]
+                selected_visible_metaids = set(selected_rows["MetaID"].dropna().tolist())
+                
+                # 3. Identify what was marked in DB but is NOT currently visible (Hidden)
+                # marked_metaids comes from db logic at start of render
+                current_db_marked = set(marked_metaids)
+                hidden_marked = current_db_marked - visible_metaids
+                
+                # 4. Merge: Hidden (preserved) + Visible (newly selected)
+                final_selection = list(hidden_marked | selected_visible_metaids)
+                
+                db_logic.save_session_documents(history_db, current_session_id, final_selection)
+                
+                # Reset "Select All" state so it doesn't stick
+                st.session_state.mark_all_state = None
+                st.session_state.kb_table_version += 1
+                
+                st.success(f"Marked {len(final_selection)} documents!")
                 st.rerun()
 
     # [ACTION 2] Delete Selected
@@ -446,6 +472,11 @@ def render(history_db=None):
                             knowledge.remove_content_by_id(row["ID"])
                             if row["MetaID"]:
                                 db_logic.remove_document_from_usages(history_db, row["MetaID"])
+                    
+                    # Reset states
+                    st.session_state.delete_all_state = None
+                    st.session_state.kb_table_version += 1
+                    
                     st.success("Deleted successfully!")
                 except Exception as e:
                     st.error(f"Error: {e}")
