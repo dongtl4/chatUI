@@ -13,3 +13,4 @@ test*.py
 *.json
 docs/*
 HSDB/*
+.env
