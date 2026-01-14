@@ -39,14 +39,33 @@ def filter_contents_by_name(contents, search_str, relation):
         return contents
 
     filtered = []
+    # Normalize search string
+    search_lower = search_str.lower().strip()
+
     for c in contents:
-        name = c.name
+        name_lower = c.name.lower()
+        matches_criteria = False
+
+        # Step 1: Split by ' OR ' first.
+        or_groups = search_lower.split(' or ')
+
+        for group in or_groups:
+            # Step 2: Split each group by ' AND '.
+            and_terms = [t.strip() for t in group.split(' and ') if t.strip()]
+            
+            # Check if ALL terms in this group are in the name
+            if all(term in name_lower for term in and_terms):
+                matches_criteria = True
+                break 
+
+        # Apply relation (Keep if 'in', Exclude if 'not in')
         if relation == 'in':
-            if search_str.lower() in name.lower():
+            if matches_criteria:
                 filtered.append(c)
         elif relation == 'not in':
-            if search_str.lower() not in name.lower():
+            if not matches_criteria:
                 filtered.append(c)
+
     return filtered
 
 def filter_contents_by_status(contents, status_str, relation):
