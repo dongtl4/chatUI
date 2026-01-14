@@ -24,8 +24,8 @@ def get_default_settings():
     else:
         return {
             "provider": "Ollama",
-            "host": "http://10.10.128.140:11434",
-            "id": "llama3.2",
+            "host": os.getenv("OLLAMA_HOST"),
+            "id": "llama3.2:latest",
             "name": "Ollama Llama 3.2 Model"
         }
 
@@ -92,7 +92,8 @@ def render():
             elif selected_provider == "DeepSeek":
                 input_defaults = {"id": "deepseek-chat", "name": "DeepSeek Model", "api_key": os.getenv("DEEPSEEK_API_KEY")}
             elif selected_provider == "Ollama":
-                input_defaults = {"host": "http://10.10.128.140:11434", "id": "llama3.2", "name": "Ollama LLama3.2 Model"}
+                input_defaults = {"host": os.getenv("OLLAMA_HOST"), "id": "llama3.2:latest", "name": "Ollama LLama3.2 Model"}
+                print(os.getenv("OLLAMA_HOST"))
 
         new_params = {"provider": selected_provider}
         
@@ -101,8 +102,8 @@ def render():
             new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", ""))
             new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", ""))
         elif selected_provider == "Ollama":
-            new_params["host"] = st.text_input("Host", value=input_defaults.get("host", "http://10.10.128.140:11434"))
-            new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", "llama3.2"))
+            new_params["host"] = st.text_input("Host", value=input_defaults.get("host", "http://localhost:11434"))
+            new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", "llama3.2:latest"))
             new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", "Ollama Agent"))
 
     
