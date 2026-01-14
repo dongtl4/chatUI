@@ -48,6 +48,8 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
 
     if kb_config['reranker_type'] == "Heuristic":
         reranker = OllamaHeuristicReranker(
+            model = kb_config['reranker_model'],
+            host = os.getenv("OLLAMA_HOST", "http://localhost:11434"),
             top_n = kb_config['top_n'],
             score_threshold = kb_config['score_threshold'],
             collected_number = kb_config['collected_number']

@@ -13,6 +13,7 @@ def get_env_defaults():
         "max_results": 20,
         "knowledge_name": "Default Knowledge Base",
         "reranker_type": "None",
+        "reranker_model": "qwen3:latest",
         "top_n": 5,
         "score_threshold": 0.8,
         "collected_number": 10
@@ -65,6 +66,7 @@ def render():
         )
 
         if selected_reranker_type == "Heuristic":
+            rk_model = st.text_input("Reranker model", value=current_config.get("reranker_model"))
             topn, scorethrses, collnum = st.columns(3)
             with topn:
                 rk_topn = st.number_input("Top n output", value=current_config.get("top_n"), min_value=1)
@@ -83,6 +85,7 @@ def render():
             if selected_reranker_type != "None":
                 st.session_state["kb_confirmed_config"].update({
                     "reranker_type": selected_reranker_type,
+                    "reranker_model": rk_model,
                     "top_n": rk_topn, "score_threshold": rk_score_thres, "collected_number": rk_collect_num,
                 })
             else:
