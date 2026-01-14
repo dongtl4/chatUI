@@ -549,6 +549,7 @@ def render(history_db=None):
                         st.write(f"- Name: {res.name}")
                         st.write(f"  - Content (truncated): {res.content[:500]}...")
                         st.write(f"  - Metadata: {res.meta_data}")
+                        st.write(f"  - Reranking score: {res.reranking_score}")
                         st.write("-----")
             except Exception as e:
                 st.error(f"Error during test query: {e}")

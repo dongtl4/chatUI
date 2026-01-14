@@ -10,6 +10,8 @@ import os
 from dotenv import load_dotenv
 # for debugging
 import time
+# reranker
+from src.utils.heuristic_reranker import OllamaHeuristicReranker
 
 load_dotenv()
 
@@ -44,11 +46,19 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
         host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
     )
 
+    if kb_config['reranker_type'] == "Heuristic":
+        reranker = OllamaHeuristicReranker(
+            top_n = kb_config['top_n'],
+            score_threshold = kb_config['score_threshold'],
+            collected_number = kb_config['collected_number']
+        )
+
     vector_db = PgVector(
         table_name=kb_config['table_name'],
         db_url=db_url,
         search_type=SearchType.hybrid,
         embedder=embedder,
+        reranker = reranker if kb_config['reranker_type'] != 'None' else None
     )
 
     contents_db = PostgresDb(
