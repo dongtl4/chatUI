@@ -6,8 +6,12 @@ from agno.knowledge.embedder.ollama import OllamaEmbedder
 from agno.vectordb.search import SearchType
 # from agno.utils.log import logger
 import streamlit as st
+import os
+from dotenv import load_dotenv
 # for debugging
 import time
+
+load_dotenv()
 
 @st.cache_resource
 def ensure_database_exists(kb_config: dict):
@@ -37,7 +41,7 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
     embedder = OllamaEmbedder(
         id="embeddinggemma:latest", 
         dimensions=768, 
-        host="http://10.10.128.140:11434"
+        host=os.getenv("OLLAMA_HOST", "http://localhost:11434")
     )
 
     vector_db = PgVector(

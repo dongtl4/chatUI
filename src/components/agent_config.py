@@ -3,6 +3,9 @@ import os
 import json
 import src.core.agent as agent_logic
 import src.core.db as db_logic
+from dotenv import load_dotenv
+
+load_dotenv()
 
 def get_default_settings():
     """Returns default settings based on environment variables."""
@@ -92,8 +95,7 @@ def render():
             elif selected_provider == "DeepSeek":
                 input_defaults = {"id": "deepseek-chat", "name": "DeepSeek Model", "api_key": os.getenv("DEEPSEEK_API_KEY")}
             elif selected_provider == "Ollama":
-                input_defaults = {"host": os.getenv("OLLAMA_HOST"), "id": "llama3.2:latest", "name": "Ollama LLama3.2 Model"}
-                print(os.getenv("OLLAMA_HOST"))
+                input_defaults = {"host": os.getenv("OLLAMA_HOST", "http://localhost:11434"), "id": "llama3.2:latest", "name": "Ollama LLama3.2 Model"}
 
         new_params = {"provider": selected_provider}
         
@@ -102,7 +104,7 @@ def render():
             new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", ""))
             new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", ""))
         elif selected_provider == "Ollama":
-            new_params["host"] = st.text_input("Host", value=input_defaults.get("host", "http://localhost:11434"))
+            new_params["host"] = st.text_input("Host", value=input_defaults.get("host"))
             new_params["id"] = st.text_input("Model ID", value=input_defaults.get("id", "llama3.2:latest"))
             new_params["name"] = st.text_input("Model Name", value=input_defaults.get("name", "Ollama Agent"))
 
