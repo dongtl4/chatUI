@@ -16,7 +16,9 @@ def get_env_defaults():
         "reranker_model": "qwen3:latest",
         "top_n": 5,
         "score_threshold": 0.8,
-        "collected_number": 10
+        "collected_number": 10,
+        "reasoning": False,
+        "few_shot": False,
     }
 
 def auto_initialize():
@@ -74,6 +76,11 @@ def render():
                 rk_score_thres = st.number_input("Score threshold", value=current_config.get("score_threshold"), min_value=0.0, max_value=1.0, step=0.01)
             with collnum:
                 rk_collect_num = st.number_input("Maximum collected docs", value=current_config.get("collected_number"), min_value=1)
+            reasoncol, fewshotcol = st.columns(2)
+            with reasoncol:
+                rk_reason = st.checkbox("Reasoning while rerank?", value=current_config.get("reasoning"))
+            with fewshotcol:
+                rk_fewshot = st.checkbox("Add few shot?", value=current_config.get("few_shot"))
 
         if st.button("Save & Reconnect", type="primary"):
             st.session_state['kb_confirmed_config'] = {
@@ -86,7 +93,8 @@ def render():
                 st.session_state["kb_confirmed_config"].update({
                     "reranker_type": selected_reranker_type,
                     "reranker_model": rk_model,
-                    "top_n": rk_topn, "score_threshold": rk_score_thres, "collected_number": rk_collect_num,
+                    "top_n": rk_topn, "score_threshold": rk_score_thres, "collected_number": rk_collect_num, 
+                    "reasoning": rk_reason, "few_shot": rk_fewshot,
                 })
             else:
                 st.session_state["kb_confirmed_config"].update({

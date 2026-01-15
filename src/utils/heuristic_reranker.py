@@ -8,6 +8,8 @@ from agno.knowledge.reranker.base import Reranker
 from agno.utils.log import logger
 from agno.models.ollama import Ollama
 from agno.models.message import Message
+from agno.models.deepseek import DeepSeek
+from agno.models.openai import OpenAIChat
 
 load_dotenv()
 
@@ -21,6 +23,33 @@ class HeuristicReranker(Reranker):
     top_n: Optional[int] = None
     score_threshold: Optional[float] = None
     collected_number: Optional[int] = None
+    reasoning: bool = False
+    add_few_shot: bool = False
+    few_shot_examples: str = """
+        ### Example 1
+        Query: "What is the capital of France?"
+        Document Chunk: "Paris is the capital and most populous city of France. It is situated on the Seine River."
+        Analysis: The chunk explicitly states that Paris is the capital of France, directly answering the query.
+        <score>0.98</score>
+
+        ### Example 2
+        Query: "How to fix a flat tire?"
+        Document Chunk: "A flat tire can be dangerous. Always ensure you have a spare tire, a jack, and a lug wrench in your trunk before driving."
+        Analysis: The chunk lists the necessary tools for fixing a flat tire, which is crucial supporting information, but it does not provide the actual steps to perform the repair.
+        <score>0.83</score>
+
+        ### Example 3
+        Query: "How do I install Python on Mac?"
+        Document Chunk: "Python is a high-level, general-purpose programming language. Its design philosophy emphasizes code readability and can be installed easily on all computers."
+        Analysis: The chunk defines what Python is but does not provide installation instructions for Mac. It is semantically relevant but functionally incomplete.
+        <score>0.57</score>
+
+        ### Example 4
+        Query: "Best pizza in New York"
+        Document Chunk: "The history of New York dates back to 1624. It was originally founded as a trading post by colonists of the Dutch Republic."
+        Analysis: The chunk discusses New York history but makes no mention of food or pizza. The shared keyword is coincidental and provides no useful context for the user's intent.
+        <score>0.35</score>
+        """
     
     # Internal LLM instance (to be set by child classes)
     _llm: Optional[Any] = None
@@ -56,20 +85,52 @@ class HeuristicReranker(Reranker):
         for doc in documents:
             try:
                 # Construct a strict prompt to get a numerical score
-                prompt = (
-                    f"Query: {query}\n"
-                    f"Document Chunk: {doc.content}\n\n"
-                    "Task: Evaluate the relevance of the Document Chunk to the Query.\n"
-                    "Output a single float number between 0.01 (completely irrelevant) and 1.00 (highly relevant).\n"
-                    "Output ONLY the number, no explanation, no words."
-                )
+                if self.reasoning:
+                    prompt = (
+                        "###Task: Evaluate the relevance of the Document Chunk to the Query.\n\n"
+
+                        "###Instructions:\n"
+                        "1. Briefly analyze the relevance (1-2 sentences).\n"
+                        "2. Assign a float score based on the rubric.\n"
+                        "3. Enclose the score within <score> and </score> tags.\n"
+                        "4. Example output format: ... reasoning ... <score>0.8</score>\n\n"
+
+                        "###Scoring Rubric:\n"
+                        "- 0.9-1.0 (Highly Relevant): The chunk contains the direct answer to the query.\n"
+                        "- 0.7-0.89 (Relevant): The chunk contains supporting information or context relevant to the query.\n"
+                        "- 0.4-0.59 (Somewhat Relevant): The chunk mentions the topic but does not answer the query.\n"
+                        "- 0.0-0.39 (Irrelevant): The chunk is unrelated.\n\n"
+
+                        f"Examples:\n{self.few_shot_examples if self.add_few_shot else ""}\n\n"
+
+                        "### Input:\n"
+                        f"Query: {query}\n"
+                        f"Document Chunk: {doc.content}\n\n"
+                    )
+                else:
+                    prompt = (
+                        "###Task: Evaluate the relevance of the Document Chunk to the Query.\n"
+                        "Output a single float number between 0.01 (completely irrelevant) and 1.00 (highly relevant).\n"
+                        "Output ONLY the number within <score> and </score> tags, no explanation, no words.\n"
+                        "Example output format: <score>0.8</score>"
+
+                        "###Scoring Rubric:\n"
+                        "- 0.9-1.0 (Highly Relevant): The chunk contains the direct answer to the query.\n"
+                        "- 0.7-0.89 (Relevant): The chunk contains supporting information or context relevant to the query.\n"
+                        "- 0.4-0.59 (Somewhat Relevant): The chunk mentions the topic but does not answer the query.\n"
+                        "- 0.0-0.39 (Irrelevant): The chunk is unrelated.\n\n"
+
+                        "### Input:\n"
+                        f"Query: {query}\n"
+                        f"Document Chunk: {doc.content}\n\n"
+                    )
 
                 # Use the pre-initialized client (self._llm)
                 response = self._llm.response(messages=[Message(role="user", content=prompt)])
                 response_text = response.content if response and response.content else ""
                 
                 # Extract the first floating point number found in the response
-                match = re.search(r"(\d+(\.\d+)?)", response_text)
+                match = re.search(r"<score>\s*(\d+(\.\d+)?)\s*</score>", response_text)
                 if match:
                     score = float(match.group(1))
                     score = max(0.0, min(1.0, score))                    
@@ -119,3 +180,20 @@ class OllamaHeuristicReranker(HeuristicReranker):
         super().__init__(**data)
         # Initialize the Ollama client
         self._llm = Ollama(id=self.model, host=self.host)
+
+class APIHeuristicReranker(HeuristicReranker):
+    """
+    Reranker imprelemtation for API models.
+    Current available: Deepseek/openAI
+    """
+    provider: str = "deepseek"
+    model: str = 'deepseek-chat'
+    api_key: str = os.getenv("DEEPSEEK_API_KEY")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Initialize the API client
+        if self.provider == 'deepseek':
+            self._llm = DeepSeek(id=self.model, api_key=self.api_key)
+        if self.provider == 'openai':
+            self._llm = OpenAIChat(id=self.model, api_key=self.api_key)

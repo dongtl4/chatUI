@@ -52,7 +52,9 @@ def setup_knowledge_base(kb_config: dict) -> Knowledge:
             host = os.getenv("OLLAMA_HOST", "http://localhost:11434"),
             top_n = kb_config['top_n'],
             score_threshold = kb_config['score_threshold'],
-            collected_number = kb_config['collected_number']
+            collected_number = kb_config['collected_number'],
+            reasoning = kb_config['reasoning'],
+            add_few_shot = kb_config['few_shot']
         )
 
     vector_db = PgVector(
