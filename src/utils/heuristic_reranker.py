@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Type, Any
 import os
 import re
 from dotenv import load_dotenv
@@ -11,29 +11,24 @@ from agno.models.message import Message
 
 load_dotenv()
 
-class OllamaHeuristicReranker(Reranker):
+class HeuristicReranker(Reranker):
     """
-    A Reranker that uses an Ollama text generation model to score relevance 
-    between a query and document chunks.
+    Base class for Rerankers that use an LLM to score relevance.
+    Handles input validation and the core reranking loop.
     """
-    # 1. These are default values.
-    model: str = "qwen3:latest"
-    host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+    # Common configuration
+    model: str
     top_n: Optional[int] = None
     score_threshold: Optional[float] = None
-    collected_number: Optional[int] = None    
+    collected_number: Optional[int] = None
     
-    # Private attribute to store the active client
-    _llm: Optional[Ollama] = None
+    # Internal LLM instance (to be set by child classes)
+    _llm: Optional[Any] = None
 
     def __init__(self, **data):
-        """
-        Initializes the Reranker with validation for parameters.
-        """
-        # Pass data to Pydantic's init logic first to set attributes
         super().__init__(**data)
         
-        # Validate input
+        # 1. Centralized Validation Logic
         if self.top_n is not None and self.top_n < 1:
             raise ValueError(f"top_n must be a positive integer, got {self.top_n}")            
         if self.collected_number is not None and self.collected_number < 1:
@@ -43,15 +38,16 @@ class OllamaHeuristicReranker(Reranker):
         if self.collected_number is not None and self.score_threshold is None:
             raise ValueError("score_threshold must be provided when collected_number is set.")
 
-        # Initialize the LLM client once
-        self._llm = Ollama(id=self.model, host=self.host)
-
     def rerank(self, query: str, documents: List[Document]) -> List[Document]:
         """
-        Reranks a list of documents based on the relevance to the query.
+        Core reranking logic shared by all implementations.
         """
         if not documents:
             return []
+        
+        if self._llm is None:
+            logger.error("LLM client is not initialized.")
+            return documents
 
         logger.info(f"Reranking {len(documents)} documents using {self.model}")
         
@@ -110,3 +106,16 @@ class OllamaHeuristicReranker(Reranker):
             return scored_docs[:self.top_n]
         
         return scored_docs
+
+
+class OllamaHeuristicReranker(HeuristicReranker):
+    """
+    Reranker implementation specifically for Ollama models.
+    """
+    model: str = "qwen3:latest"
+    host: str = os.getenv("OLLAMA_HOST", "http://localhost:11434")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        # Initialize the Ollama client
+        self._llm = Ollama(id=self.model, host=self.host)
